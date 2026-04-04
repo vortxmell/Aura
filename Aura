@@ -1,19 +1,17 @@
--- Auto Hub v3 - NO POPUP TEST BUILD
+-- Auto Hub v3 - Compact GUI + Combo Target System
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RequestRebirth = RS:WaitForChild("Communication"):WaitForChild("RequestRebirth")
-local UIS = game:GetService("UserInputService")
 
 local areas = {
-    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
-    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(7,    15,  -132)},
-    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(289,  11,  -245)},
-    {name = "Egg Basket",    req = 99e21,   pos = Vector3.new(326,  10,   -82)},
-    {name = "Electra Field", req = 100e24,  pos = Vector3.new(69,   10,   166)},
-    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(79,   31,  -334)},
-    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-219, 10,   -50)},
-    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(321,  14,   112)},
+    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(118,  10,  -123)},
+    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(40,   17,  -136)},
+    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(249,  10,   -80)},
+    {name = "Electra Field", req = 100e24,  pos = Vector3.new(72,    9,   104)},
+    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(70,   30,  -288)},
+    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-225,  9,    -6)},
+    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(326,  13,   150)},
 }
 
 local autoTraining = false
@@ -22,270 +20,255 @@ local autoCombo    = false
 local currentArea  = nil
 local rebirthCount = 0
 local threshold    = 2
-local comboTarget      = nil
-local rebirthDone      = false
-local userPickedTarget = false
+
+-- Combo target state
+local comboTarget       = nil   -- area table yang dah Set
+local pendingTarget     = nil   -- area table dalam popup (belum Set)
+local rebirthDone       = false -- flag: dah rebirth untuk target semasa?
+local userPickedTarget  = false -- flag: user manually pick (jangan auto-advance override)
 
 local suffixes = {
-    {1e39,"Dd"},{1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
-    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
-    {1e15,"Qa"},{1e12,"T"}, {1e9,"B"},  {1e6,"M"},{1e3,"K"},
+    {1e39, "Dd"}, {1e36, "Ud"}, {1e33, "Dc"}, {1e30, "No"},
+    {1e27, "Oc"}, {1e24, "Sp"}, {1e21, "Sx"}, {1e18, "Qi"},
+    {1e15, "Qa"}, {1e12, "T"},  {1e9,  "B"},  {1e6,  "M"}, {1e3, "K"},
 }
+
 local function formatNum(n)
-    for _,s in ipairs(suffixes) do
-        if n >= s[1] then return string.format("%.1f%s", n/s[1], s[2]) end
+    for _, s in ipairs(suffixes) do
+        if n >= s[1] then
+            return string.format("%.1f%s", n / s[1], s[2])
+        end
     end
     return tostring(math.floor(n))
 end
-local function getAura() return player:GetAttribute("Aura") or 0 end
+
+local function getAura()
+    return player:GetAttribute("Aura") or 0
+end
+
 local function teleport(pos)
-    local c = player.Character
-    if c and c:FindFirstChild("HumanoidRootPart") then
-        c.HumanoidRootPart.CFrame = CFrame.new(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
     end
 end
+
 local function getBestArea(aura)
     local best = nil
-    for _,a in ipairs(areas) do if aura >= a.req then best = a end end
+    for _, area in ipairs(areas) do
+        if aura >= area.req then best = area end
+    end
     return best
 end
+
 local function getNextArea(aura)
-    for _,a in ipairs(areas) do if aura < a.req then return a end end
+    for _, area in ipairs(areas) do
+        if aura < area.req then return area end
+    end
     return nil
 end
+
 local function getAreaIndex(area)
     if not area then return 0 end
-    for i,a in ipairs(areas) do if a.name == area.name then return i end end
+    for i, a in ipairs(areas) do
+        if a.name == area.name then return i end
+    end
     return 0
 end
 
--- ─── Tween ───────────────────────────────────────────────────────────────────
-local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
-
--- ─── Constants ───────────────────────────────────────────────────────────────
-local ROW_H  = 16
-local SEC_H  = 12
-local STAT_H = 12
-local GAP    = 4
-local PAD_TOP= 38
-local PAD_X  = 12
-local WHITE  = Color3.fromRGB(255,255,255)
-local DIM    = Color3.fromRGB(120,110,140)
-local PURPLE = Color3.fromRGB(110,70,200)
-local WARN   = Color3.fromRGB(255,180,60)
+-- ─── GUI Constants ────────────────────────────────────────────────────────────
+local ROW_H   = 16
+local SEC_H   = 12
+local STAT_H  = 12
+local GAP     = 4
+local PAD_TOP = 38
+local PAD_X   = 12
+local WHITE   = Color3.fromRGB(255, 255, 255)
+local DIM     = Color3.fromRGB(120, 110, 140)
+local PURPLE  = Color3.fromRGB(110, 70, 200)
+local WARN    = Color3.fromRGB(255, 180, 60)
 
 -- ─── ScreenGui ───────────────────────────────────────────────────────────────
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = player.PlayerGui
 
 -- ─── Main Frame ──────────────────────────────────────────────────────────────
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 210, 0, 300)
 Main.Position = UDim2.new(0, 16, 0.5, -150)
-Main.BackgroundColor3 = Color3.fromRGB(10,10,14)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
-Main.Active = false
-Main.Draggable = false
+Main.Active = true
+Main.Draggable = true
 Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0,14)
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 local MainStroke = Instance.new("UIStroke", Main)
-MainStroke.Color = Color3.fromRGB(80,60,120)
+MainStroke.Color = Color3.fromRGB(80, 60, 120)
 MainStroke.Thickness = 1
 
--- ─── Title Bar ───────────────────────────────────────────────────────────────
+-- Title Bar
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1,0,0,36)
+TitleBar.Size = UDim2.new(1, 0, 0, 36)
 TitleBar.BackgroundTransparency = 1
 TitleBar.Parent = Main
 
-local DragHandle = Instance.new("TextButton")
-DragHandle.Size = UDim2.new(1,-60,1,0)
-DragHandle.Position = UDim2.new(0,0,0,0)
-DragHandle.BackgroundTransparency = 1
-DragHandle.Text = ""
-DragHandle.ZIndex = 2
-DragHandle.Parent = TitleBar
-
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1,-70,1,0)
-Title.Position = UDim2.new(0,14,0,0)
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "⚡ AUTO HUB"
 Title.TextColor3 = WHITE
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.ZIndex = 2
 Title.Parent = TitleBar
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0,22,0,22)
-MinBtn.Position = UDim2.new(1,-52,0.5,-11)
-MinBtn.BackgroundColor3 = Color3.fromRGB(60,55,80)
+MinBtn.Size = UDim2.new(0, 22, 0, 22)
+MinBtn.Position = UDim2.new(1, -52, 0.5, -11)
+MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
 MinBtn.BorderSizePixel = 0
 MinBtn.Text = "—"
 MinBtn.TextColor3 = WHITE
 MinBtn.TextSize = 10
 MinBtn.Font = Enum.Font.GothamBold
-MinBtn.ZIndex = 5
-MinBtn.Parent = Main
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1,0)
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
 
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0,22,0,22)
-CloseBtn.Position = UDim2.new(1,-26,0,7)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(160,50,70)
+CloseBtn.Size = UDim2.new(0, 22, 0, 22)
+CloseBtn.Position = UDim2.new(1, -26, 0.5, -11)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = WHITE
 CloseBtn.TextSize = 10
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.ZIndex = 5
-CloseBtn.Parent = Main
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1,0)
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
 local TitleDiv = Instance.new("Frame")
-TitleDiv.Size = UDim2.new(0.85,0,0,1)
-TitleDiv.Position = UDim2.new(0.075,0,0,36)
-TitleDiv.BackgroundColor3 = Color3.fromRGB(60,45,90)
+TitleDiv.Size = UDim2.new(0.85, 0, 0, 1)
+TitleDiv.Position = UDim2.new(0.075, 0, 0, 36)
+TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TitleDiv.BorderSizePixel = 0
 TitleDiv.Parent = Main
 
--- ─── Drag Logic ──────────────────────────────────────────────────────────────
-local dragging, dragStart, startPos = false, nil, nil
-DragHandle.MouseButton1Down:Connect(function(x,y)
-    dragging = true
-    dragStart = Vector2.new(x,y)
-    startPos  = Main.Position
-end)
-UIS.InputChanged:Connect(function(input)
-    if not dragging then return end
-    if input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch then
-        local d = input.Position - Vector3.new(dragStart.X, dragStart.Y, 0)
-        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X,
-                                   startPos.Y.Scale, startPos.Y.Offset+d.Y)
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-
 -- ─── Content ─────────────────────────────────────────────────────────────────
 local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1,0,1,-PAD_TOP)
-Content.Position = UDim2.new(0,0,0,PAD_TOP)
+Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
+Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
 Content.BackgroundTransparency = 1
 Content.ClipsDescendants = true
 Content.Parent = Main
 
 local y = GAP
-local function nextY(h) local c=y; y=y+h+GAP; return c end
+
+local function nextY(h)
+    local cur = y
+    y = y + h + GAP
+    return cur
+end
 
 local function makeDivider()
     local d = Instance.new("Frame")
-    d.Size = UDim2.new(0.85,0,0,1)
-    d.Position = UDim2.new(0.075,0,0,nextY(1))
-    d.BackgroundColor3 = Color3.fromRGB(40,35,60)
+    d.Size = UDim2.new(0.85, 0, 0, 1)
+    d.Position = UDim2.new(0.075, 0, 0, nextY(1))
+    d.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     d.BorderSizePixel = 0
     d.Parent = Content
 end
 
 local function makeStatusLabel(text, color)
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1,-20,0,STAT_H)
-    l.Position = UDim2.new(0,PAD_X,0,nextY(STAT_H))
-    l.BackgroundTransparency = 1
-    l.Text = text
-    l.TextColor3 = color or WHITE
-    l.TextSize = 9
-    l.Font = Enum.Font.Gotham
-    l.TextXAlignment = Enum.TextXAlignment.Left
-    l.Parent = Content
-    return l
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, STAT_H)
+    lbl.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = color or WHITE
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = Content
+    return lbl
 end
 
 local function makeSection(text)
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1,-20,0,SEC_H)
-    l.Position = UDim2.new(0,PAD_X+2,0,nextY(SEC_H))
-    l.BackgroundTransparency = 1
-    l.Text = text
-    l.TextColor3 = WHITE
-    l.TextSize = 8
-    l.Font = Enum.Font.GothamBold
-    l.TextXAlignment = Enum.TextXAlignment.Left
-    l.Parent = Content
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, SEC_H)
+    lbl.Position = UDim2.new(0, PAD_X + 2, 0, nextY(SEC_H))
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = WHITE
+    lbl.TextSize = 8
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = Content
 end
 
 local function makeToggleRow(labelText)
     local rowY = nextY(ROW_H)
-    local Row = Instance.new("TextButton")  -- ROW ITSELF IS TEXTBUTTON, no separate hitbox
-    Row.Size = UDim2.new(1,-PAD_X*2,0,ROW_H)
-    Row.Position = UDim2.new(0,PAD_X,0,rowY)
-    Row.BackgroundColor3 = Color3.fromRGB(18,16,26)
-    Row.BorderSizePixel = 0
-    Row.Text = ""
-    Row.Parent = Content
-    Instance.new("UICorner", Row).CornerRadius = UDim.new(0,6)
-    local RowStroke = Instance.new("UIStroke", Row)
-    RowStroke.Color = Color3.fromRGB(60,45,90)
-    RowStroke.Thickness = 1
-
+    local Btn = Instance.new("Frame")
+    Btn.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    Btn.Position = UDim2.new(0, PAD_X, 0, rowY)
+    Btn.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    Btn.BorderSizePixel = 0
+    Btn.Parent = Content
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    local BtnStroke = Instance.new("UIStroke", Btn)
+    BtnStroke.Color = Color3.fromRGB(60, 45, 90)
+    BtnStroke.Thickness = 1
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1,-50,1,0)
-    Label.Position = UDim2.new(0,8,0,0)
+    Label.Size = UDim2.new(1, -50, 1, 0)
+    Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = labelText
     Label.TextColor3 = WHITE
     Label.TextSize = 10
     Label.Font = Enum.Font.GothamBold
     Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Row
-
+    Label.Parent = Btn
     local Pill = Instance.new("Frame")
-    Pill.Size = UDim2.new(0,28,0,14)
-    Pill.Position = UDim2.new(1,-36,0.5,-7)
-    Pill.BackgroundColor3 = Color3.fromRGB(40,35,55)
+    Pill.Size = UDim2.new(0, 28, 0, 14)
+    Pill.Position = UDim2.new(1, -36, 0.5, -7)
+    Pill.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
     Pill.BorderSizePixel = 0
-    Pill.Parent = Row
-    Instance.new("UICorner", Pill).CornerRadius = UDim.new(1,0)
-
+    Pill.Parent = Btn
+    Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
     local Dot = Instance.new("Frame")
-    Dot.Size = UDim2.new(0,10,0,10)
-    Dot.Position = UDim2.new(0,2,0.5,-5)
-    Dot.BackgroundColor3 = Color3.fromRGB(100,90,130)
+    Dot.Size = UDim2.new(0, 10, 0, 10)
+    Dot.Position = UDim2.new(0, 2, 0.5, -5)
+    Dot.BackgroundColor3 = Color3.fromRGB(100, 90, 130)
     Dot.BorderSizePixel = 0
     Dot.Parent = Pill
-    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
-
-    return Row, Pill, Dot, RowStroke
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1, 0, 1, 0)
+    Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""
+    Hitbox.Parent = Btn
+    return Hitbox, Pill, Dot, BtnStroke
 end
 
 local function makeThresholdRow()
     local rowY = nextY(ROW_H)
     local TFrame = Instance.new("Frame")
-    TFrame.Size = UDim2.new(1,-PAD_X*2,0,ROW_H)
-    TFrame.Position = UDim2.new(0,PAD_X,0,rowY)
-    TFrame.BackgroundColor3 = Color3.fromRGB(18,16,26)
+    TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
+    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
     TFrame.BorderSizePixel = 0
     TFrame.Parent = Content
-    Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0,6)
+    Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
     local TStroke = Instance.new("UIStroke", TFrame)
-    TStroke.Color = Color3.fromRGB(60,45,90)
+    TStroke.Color = Color3.fromRGB(60, 45, 90)
     TStroke.Thickness = 1
-
     local TLabel = Instance.new("TextLabel")
-    TLabel.Size = UDim2.new(0.5,0,1,0)
-    TLabel.Position = UDim2.new(0,8,0,0)
+    TLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
     TLabel.Text = "Threshold"
     TLabel.TextColor3 = WHITE
@@ -293,125 +276,380 @@ local function makeThresholdRow()
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
     TLabel.Parent = TFrame
-
     local MinusB = Instance.new("TextButton")
-    MinusB.Size = UDim2.new(0,16,0,16)
-    MinusB.Position = UDim2.new(1,-56,0.5,-8)
-    MinusB.BackgroundColor3 = Color3.fromRGB(40,35,60)
+    MinusB.Size = UDim2.new(0, 16, 0, 16)
+    MinusB.Position = UDim2.new(1, -56, 0.5, -8)
+    MinusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     MinusB.BorderSizePixel = 0
     MinusB.Text = "−"
     MinusB.TextColor3 = WHITE
     MinusB.TextSize = 11
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
-    Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1,0)
-
+    Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
     local TVal = Instance.new("TextLabel")
-    TVal.Size = UDim2.new(0,22,1,0)
-    TVal.Position = UDim2.new(1,-38,0,0)
+    TVal.Size = UDim2.new(0, 22, 1, 0)
+    TVal.Position = UDim2.new(1, -38, 0, 0)
     TVal.BackgroundTransparency = 1
     TVal.Text = "2x"
     TVal.TextColor3 = WHITE
     TVal.TextSize = 10
     TVal.Font = Enum.Font.GothamBold
     TVal.Parent = TFrame
-
     local PlusB = Instance.new("TextButton")
-    PlusB.Size = UDim2.new(0,16,0,16)
-    PlusB.Position = UDim2.new(1,-18,0.5,-8)
-    PlusB.BackgroundColor3 = Color3.fromRGB(40,35,60)
+    PlusB.Size = UDim2.new(0, 16, 0, 16)
+    PlusB.Position = UDim2.new(1, -18, 0.5, -8)
+    PlusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     PlusB.BorderSizePixel = 0
     PlusB.Text = "+"
     PlusB.TextColor3 = WHITE
     PlusB.TextSize = 11
     PlusB.Font = Enum.Font.GothamBold
     PlusB.Parent = TFrame
-    Instance.new("UICorner", PlusB).CornerRadius = UDim.new(1,0)
-
+    Instance.new("UICorner", PlusB).CornerRadius = UDim.new(1, 0)
     return MinusB, TVal, PlusB
+end
+
+-- Target row (clickable, opens popup)
+local function makeTargetRow()
+    local rowY = nextY(ROW_H)
+    local TFrame = Instance.new("Frame")
+    TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
+    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BorderSizePixel = 0
+    TFrame.Parent = Content
+    Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
+    local TStroke = Instance.new("UIStroke", TFrame)
+    TStroke.Color = Color3.fromRGB(60, 45, 90)
+    TStroke.Thickness = 1
+    local TLabel = Instance.new("TextLabel")
+    TLabel.Size = UDim2.new(0.45, 0, 1, 0)
+    TLabel.Position = UDim2.new(0, 8, 0, 0)
+    TLabel.BackgroundTransparency = 1
+    TLabel.Text = "Target"
+    TLabel.TextColor3 = WHITE
+    TLabel.TextSize = 10
+    TLabel.Font = Enum.Font.GothamBold
+    TLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TLabel.Parent = TFrame
+    local TVal = Instance.new("TextLabel")
+    TVal.Size = UDim2.new(0.5, -8, 1, 0)
+    TVal.Position = UDim2.new(0.45, 0, 0, 0)
+    TVal.BackgroundTransparency = 1
+    TVal.Text = "—"
+    TVal.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TVal.TextSize = 9
+    TVal.Font = Enum.Font.Gotham
+    TVal.TextXAlignment = Enum.TextXAlignment.Right
+    TVal.Parent = TFrame
+    -- Arrow icon
+    local Arrow = Instance.new("TextLabel")
+    Arrow.Size = UDim2.new(0, 10, 1, 0)
+    Arrow.Position = UDim2.new(1, -12, 0, 0)
+    Arrow.BackgroundTransparency = 1
+    Arrow.Text = "›"
+    Arrow.TextColor3 = DIM
+    Arrow.TextSize = 12
+    Arrow.Font = Enum.Font.GothamBold
+    Arrow.Parent = TFrame
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1, 0, 1, 0)
+    Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""
+    Hitbox.Parent = TFrame
+    return Hitbox, TVal, TStroke
 end
 
 -- ─── Build Layout ─────────────────────────────────────────────────────────────
 local StatusLabel = makeStatusLabel("Area: —")
+
 makeDivider()
 
 makeSection("INDIVIDUAL")
 local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeToggleRow("Auto Training")
 local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeToggleRow("Auto Rebirth")
+
 makeDivider()
 
 makeSection("COMBO")
-local ComboBtn, ComboPill, ComboDot, ComboStroke = makeToggleRow("Train + Rebirth")
+local ComboBtn,  ComboPill,  ComboDot,  ComboStroke  = makeToggleRow("Train + Rebirth")
+local TargetBtn, TargetVal,  TargetStroke             = makeTargetRow()
+local MinusBtn,  ThreshValue, PlusBtn                 = makeThresholdRow()
 
--- Target label only (no popup)
-local TargetRowY = nextY(ROW_H)
-local TargetFrame = Instance.new("Frame")
-TargetFrame.Size = UDim2.new(1,-PAD_X*2,0,ROW_H)
-TargetFrame.Position = UDim2.new(0,PAD_X,0,TargetRowY)
-TargetFrame.BackgroundColor3 = Color3.fromRGB(18,16,26)
-TargetFrame.BorderSizePixel = 0
-TargetFrame.Parent = Content
-Instance.new("UICorner", TargetFrame).CornerRadius = UDim.new(0,6)
-local TFStroke = Instance.new("UIStroke", TargetFrame)
-TFStroke.Color = Color3.fromRGB(60,45,90)
-TFStroke.Thickness = 1
-local TargetLabelL = Instance.new("TextLabel")
-TargetLabelL.Size = UDim2.new(0.45,0,1,0)
-TargetLabelL.Position = UDim2.new(0,8,0,0)
-TargetLabelL.BackgroundTransparency = 1
-TargetLabelL.Text = "Target"
-TargetLabelL.TextColor3 = WHITE
-TargetLabelL.TextSize = 10
-TargetLabelL.Font = Enum.Font.GothamBold
-TargetLabelL.TextXAlignment = Enum.TextXAlignment.Left
-TargetLabelL.Parent = TargetFrame
-local TargetVal = Instance.new("TextLabel")
-TargetVal.Size = UDim2.new(0.5,-8,1,0)
-TargetVal.Position = UDim2.new(0.45,0,0,0)
-TargetVal.BackgroundTransparency = 1
-TargetVal.Text = "—"
-TargetVal.TextColor3 = Color3.fromRGB(180,150,255)
-TargetVal.TextSize = 9
-TargetVal.Font = Enum.Font.Gotham
-TargetVal.TextXAlignment = Enum.TextXAlignment.Right
-TargetVal.Parent = TargetFrame
-
-local MinusBtn, ThreshValue, PlusBtn = makeThresholdRow()
 makeDivider()
 
-local NextAreaLabel  = makeStatusLabel("Target: —")
+local NextAreaLabel  = makeStatusLabel("Next: —")
 local ReqLabel       = makeStatusLabel("Req: —")
 local RebirthAtLabel = makeStatusLabel("Rebirth at: —")
 local WarnLabel      = makeStatusLabel("", WARN)
 local RebirthLabel   = makeStatusLabel("Rebirths: 0")
 
--- Resize
-local fullH = PAD_TOP + y + 4
-Main.Size = UDim2.new(0, 210, 0, fullH)
-Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
+-- Resize main frame
+Main.Size = UDim2.new(0, 210, 0, PAD_TOP + y + 4)
+Main.Position = UDim2.new(0, 16, 0.5, -(PAD_TOP + y + 4)/2)
 
--- ─── Toggle Helper ───────────────────────────────────────────────────────────
-local function setToggle(pill, dot, stroke, on)
-    if on then
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
+-- ─── Popup ────────────────────────────────────────────────────────────────────
+local POPUP_W = 190
+local POPUP_ITEM_H = 20
+local POPUP_H = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
+
+local Backdrop = Instance.new("Frame")
+Backdrop.Size = UDim2.new(1, 0, 1, 0)
+Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Backdrop.BackgroundTransparency = 0.5
+Backdrop.BorderSizePixel = 0
+Backdrop.ZIndex = 10
+Backdrop.Visible = false
+Backdrop.Parent = ScreenGui
+
+local Popup = Instance.new("Frame")
+Popup.Size = UDim2.new(0, POPUP_W, 0, POPUP_H)
+Popup.Position = UDim2.new(0.5, -POPUP_W/2, 0.5, -POPUP_H/2)
+Popup.BackgroundColor3 = Color3.fromRGB(15, 12, 22)
+Popup.BorderSizePixel = 0
+Popup.ZIndex = 11
+Popup.Visible = false
+Popup.Parent = ScreenGui
+Instance.new("UICorner", Popup).CornerRadius = UDim.new(0, 12)
+local PopupStroke = Instance.new("UIStroke", Popup)
+PopupStroke.Color = Color3.fromRGB(80, 60, 120)
+PopupStroke.Thickness = 1
+
+local PopupTitle = Instance.new("TextLabel")
+PopupTitle.Size = UDim2.new(1, -20, 0, 28)
+PopupTitle.Position = UDim2.new(0, 10, 0, 4)
+PopupTitle.BackgroundTransparency = 1
+PopupTitle.Text = "Select Target Area"
+PopupTitle.TextColor3 = WHITE
+PopupTitle.TextSize = 11
+PopupTitle.Font = Enum.Font.GothamBold
+PopupTitle.TextXAlignment = Enum.TextXAlignment.Left
+PopupTitle.ZIndex = 12
+PopupTitle.Parent = Popup
+
+local PopupDiv = Instance.new("Frame")
+PopupDiv.Size = UDim2.new(0.9, 0, 0, 1)
+PopupDiv.Position = UDim2.new(0.05, 0, 0, 30)
+PopupDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+PopupDiv.BorderSizePixel = 0
+PopupDiv.ZIndex = 12
+PopupDiv.Parent = Popup
+
+-- Area list items
+local popupItems = {}
+local selectedInPopup = nil  -- index of area selected in popup (not yet Set)
+
+local listStartY = 36
+for i, area in ipairs(areas) do
+    local itemY = listStartY + (i-1) * (POPUP_ITEM_H + 2)
+
+    local Item = Instance.new("Frame")
+    Item.Size = UDim2.new(1, -16, 0, POPUP_ITEM_H)
+    Item.Position = UDim2.new(0, 8, 0, itemY)
+    Item.BackgroundColor3 = Color3.fromRGB(25, 20, 38)
+    Item.BackgroundTransparency = 1
+    Item.BorderSizePixel = 0
+    Item.ZIndex = 12
+    Item.Parent = Popup
+    Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
+
+    local Dot = Instance.new("Frame")
+    Dot.Size = UDim2.new(0, 7, 0, 7)
+    Dot.Position = UDim2.new(0, 6, 0.5, -3)
+    Dot.BackgroundColor3 = DIM
+    Dot.BorderSizePixel = 0
+    Dot.ZIndex = 13
+    Dot.Parent = Item
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+
+    local NameLbl = Instance.new("TextLabel")
+    NameLbl.Size = UDim2.new(0.6, 0, 1, 0)
+    NameLbl.Position = UDim2.new(0, 18, 0, 0)
+    NameLbl.BackgroundTransparency = 1
+    NameLbl.Text = area.name
+    NameLbl.TextColor3 = WHITE
+    NameLbl.TextSize = 10
+    NameLbl.Font = Enum.Font.Gotham
+    NameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    NameLbl.ZIndex = 13
+    NameLbl.Parent = Item
+
+    local ReqLbl = Instance.new("TextLabel")
+    ReqLbl.Size = UDim2.new(0.38, 0, 1, 0)
+    ReqLbl.Position = UDim2.new(0.6, 0, 0, 0)
+    ReqLbl.BackgroundTransparency = 1
+    ReqLbl.Text = formatNum(area.req)
+    ReqLbl.TextColor3 = DIM
+    ReqLbl.TextSize = 9
+    ReqLbl.Font = Enum.Font.Gotham
+    ReqLbl.TextXAlignment = Enum.TextXAlignment.Right
+    ReqLbl.ZIndex = 13
+    ReqLbl.Parent = Item
+
+    local WarnIcon = Instance.new("TextLabel")
+    WarnIcon.Size = UDim2.new(0, 14, 1, 0)
+    WarnIcon.Position = UDim2.new(1, -16, 0, 0)
+    WarnIcon.BackgroundTransparency = 1
+    WarnIcon.Text = ""
+    WarnIcon.TextColor3 = WARN
+    WarnIcon.TextSize = 10
+    WarnIcon.Font = Enum.Font.GothamBold
+    WarnIcon.ZIndex = 13
+    WarnIcon.Parent = Item
+
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1, 0, 1, 0)
+    Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""
+    Hitbox.ZIndex = 14
+    Hitbox.Parent = Item
+
+    popupItems[i] = {
+        frame = Item,
+        dot = Dot,
+        nameLbl = NameLbl,
+        reqLbl = ReqLbl,
+        warnIcon = WarnIcon,
+        hitbox = Hitbox,
+        area = area,
+    }
+end
+
+local bottomY = listStartY + (#areas * (POPUP_ITEM_H + 2)) + 4
+
+local PopupWarnLabel = Instance.new("TextLabel")
+PopupWarnLabel.Size = UDim2.new(1, -16, 0, 14)
+PopupWarnLabel.Position = UDim2.new(0, 8, 0, bottomY)
+PopupWarnLabel.BackgroundTransparency = 1
+PopupWarnLabel.Text = ""
+PopupWarnLabel.TextColor3 = WARN
+PopupWarnLabel.TextSize = 9
+PopupWarnLabel.Font = Enum.Font.Gotham
+PopupWarnLabel.TextXAlignment = Enum.TextXAlignment.Left
+PopupWarnLabel.ZIndex = 12
+PopupWarnLabel.Parent = Popup
+
+local btnY = bottomY + 16
+
+local CancelBtn = Instance.new("TextButton")
+CancelBtn.Size = UDim2.new(0.44, 0, 0, 22)
+CancelBtn.Position = UDim2.new(0.04, 0, 0, btnY)
+CancelBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
+CancelBtn.BorderSizePixel = 0
+CancelBtn.Text = "Cancel"
+CancelBtn.TextColor3 = WHITE
+CancelBtn.TextSize = 10
+CancelBtn.Font = Enum.Font.GothamBold
+CancelBtn.ZIndex = 12
+CancelBtn.Parent = Popup
+Instance.new("UICorner", CancelBtn).CornerRadius = UDim.new(0, 6)
+
+local SetBtn = Instance.new("TextButton")
+SetBtn.Size = UDim2.new(0.44, 0, 0, 22)
+SetBtn.Position = UDim2.new(0.52, 0, 0, btnY)
+SetBtn.BackgroundColor3 = PURPLE
+SetBtn.BorderSizePixel = 0
+SetBtn.Text = "Set"
+SetBtn.TextColor3 = WHITE
+SetBtn.TextSize = 10
+SetBtn.Font = Enum.Font.GothamBold
+SetBtn.ZIndex = 12
+SetBtn.Parent = Popup
+Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0, 6)
+
+-- ─── Popup Logic ─────────────────────────────────────────────────────────────
+local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
+local function refreshPopupItems()
+    local aura = getAura()
+    for i, item in ipairs(popupItems) do
+        local isPast   = aura >= item.area.req
+        local isSel    = selectedInPopup == i
+        local isCurrent = comboTarget and comboTarget.name == item.area.name
+
+        -- background highlight
+        item.frame.BackgroundTransparency = isSel and 0 or 1
+        item.frame.BackgroundColor3 = isSel
+            and Color3.fromRGB(50, 35, 80)
+            or  Color3.fromRGB(25, 20, 38)
+
+        -- dot color
+        item.dot.BackgroundColor3 = isSel and PURPLE or (isPast and WARN or DIM)
+
+        -- name color
+        item.nameLbl.TextColor3 = isPast and WARN or WHITE
+
+        -- warn icon
+        item.warnIcon.Text = isPast and "⚠" or (isCurrent and "✓" or "")
+        item.warnIcon.TextColor3 = isPast and WARN or Color3.fromRGB(100, 220, 100)
+
+        -- req label
+        item.reqLbl.TextColor3 = isPast and WARN or DIM
+    end
+
+    -- warn label bawah
+    if selectedInPopup then
+        local sel = areas[selectedInPopup]
+        if getAura() >= sel.req then
+            PopupWarnLabel.Text = "⚠ Aura dah lepas target ni"
+        else
+            PopupWarnLabel.Text = ""
+        end
     else
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
+        PopupWarnLabel.Text = ""
     end
 end
+
+local function openPopup()
+    -- set selectedInPopup to current comboTarget index
+    selectedInPopup = nil
+    if comboTarget then
+        for i, a in ipairs(areas) do
+            if a.name == comboTarget.name then
+                selectedInPopup = i
+                break
+            end
+        end
+    end
+    refreshPopupItems()
+    Backdrop.Visible = true
+    Popup.Visible = true
+end
+
+local function closePopup()
+    Backdrop.Visible = false
+    Popup.Visible = false
+    selectedInPopup = nil
+    PopupWarnLabel.Text = ""
+end
+
+-- Item hitbox events
+for i, item in ipairs(popupItems) do
+    item.hitbox.MouseButton1Click:Connect(function()
+        selectedInPopup = i
+        refreshPopupItems()
+    end)
+end
+
+CancelBtn.MouseButton1Click:Connect(closePopup)
 
 -- ─── Status Update ───────────────────────────────────────────────────────────
 local function updateStatus()
     if comboTarget then
-        TargetVal.Text      = comboTarget.name
-        local rebirthAt     = comboTarget.req * threshold
+        TargetVal.Text = comboTarget.name
+        local rebirthAt = comboTarget.req * threshold
         NextAreaLabel.Text  = "Target: " .. comboTarget.name
         ReqLabel.Text       = "Req: " .. formatNum(comboTarget.req)
         RebirthAtLabel.Text = "Rebirth at: " .. formatNum(rebirthAt)
-        WarnLabel.Text      = getAura() >= comboTarget.req and "⚠ Aura dah lepas target" or ""
+
+        -- warn kalau aura dah lepas target
+        local aura = getAura()
+        if aura >= comboTarget.req then
+            WarnLabel.Text = "⚠ Aura dah lepas target"
+        else
+            WarnLabel.Text = ""
+        end
     else
         TargetVal.Text      = "—"
         NextAreaLabel.Text  = "Target: —"
@@ -421,58 +659,68 @@ local function updateStatus()
     end
 end
 
--- ─── Threshold ───────────────────────────────────────────────────────────────
-MinusBtn.MouseButton1Click:Connect(function()
-    if threshold > 1 then threshold -= 1; ThreshValue.Text = threshold.."x"; updateStatus() end
-end)
-PlusBtn.MouseButton1Click:Connect(function()
-    if threshold < 20 then threshold += 1; ThreshValue.Text = threshold.."x"; updateStatus() end
+-- Set button in popup
+SetBtn.MouseButton1Click:Connect(function()
+    if not selectedInPopup then
+        closePopup()
+        return
+    end
+    local chosen = areas[selectedInPopup]
+    comboTarget = chosen
+    userPickedTarget = true
+    rebirthDone = false  -- reset flag, kena rebirth semula untuk target baru
+    updateStatus()
+    closePopup()
 end)
 
--- ─── Minimize / Close ────────────────────────────────────────────────────────
-local minimized = false
-MinBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,210,0,38)}):Play()
-        Content.Visible = false
-        MinBtn.Text = "□"
+TargetBtn.MouseButton1Click:Connect(openPopup)
+Backdrop.MouseButton1Click:Connect(closePopup)
+
+-- ─── Toggle Helper ───────────────────────────────────────────────────────────
+local function setToggle(pill, dot, stroke, on)
+    if on then
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0, 16, 0.5, -5), BackgroundColor3 = WHITE}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
     else
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,210,0,fullH)}):Play()
-        Content.Visible = true
-        MinBtn.Text = "—"
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
+    end
+end
+
+-- ─── Threshold ───────────────────────────────────────────────────────────────
+MinusBtn.MouseButton1Click:Connect(function()
+    if threshold > 1 then
+        threshold -= 1
+        ThreshValue.Text = threshold .. "x"
+        updateStatus()
     end
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    autoTraining = false; autoRebirth = false; autoCombo = false
-    ScreenGui:Destroy()
-end)
-
--- ─── Toggle Events ───────────────────────────────────────────────────────────
-TrainBtn.MouseButton1Click:Connect(function()
-    autoTraining = not autoTraining
-    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
-    if not autoTraining then StatusLabel.Text = "Area: —"; currentArea = nil end
-end)
-
-RebirthBtn.MouseButton1Click:Connect(function()
-    autoRebirth = not autoRebirth
-    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
-end)
-
-ComboBtn.MouseButton1Click:Connect(function()
-    autoCombo = not autoCombo
-    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
-    if not autoCombo then StatusLabel.Text = "Area: —"; currentArea = nil end
+PlusBtn.MouseButton1Click:Connect(function()
+    if threshold < 20 then
+        threshold += 1
+        ThreshValue.Text = threshold .. "x"
+        updateStatus()
+    end
 end)
 
 -- ─── Respawn ─────────────────────────────────────────────────────────────────
 player.CharacterAdded:Connect(function()
     task.wait(3)
-    if autoTraining or autoCombo then
-        local best = getBestArea(getAura())
-        if best then
+    if (autoTraining or autoCombo) then
+        local aura = getAura()
+        local best = getBestArea(aura)
+        -- Kalau combo ON, jangan teleport ke target atau beyond kalau belum rebirth
+        if autoCombo and comboTarget and not rebirthDone then
+            local targetIdx = getAreaIndex(comboTarget)
+            if best and getAreaIndex(best) < targetIdx then
+                teleport(best.pos)
+                currentArea = best.name
+                StatusLabel.Text = "Area: " .. best.name
+            end
+        elseif best then
             teleport(best.pos)
             currentArea = best.name
             StatusLabel.Text = "Area: " .. best.name
@@ -489,7 +737,12 @@ task.spawn(function()
             if best then
                 local targetIdx = comboTarget and getAreaIndex(comboTarget) or 999
                 local bestIdx   = getAreaIndex(best)
-                local blocked   = autoCombo and comboTarget and not rebirthDone and bestIdx >= targetIdx
+
+                -- Kalau combo ON dan belum rebirth untuk target,
+                -- block teleport ke target area atau beyond
+                local blocked = autoCombo and comboTarget and not rebirthDone
+                    and bestIdx >= targetIdx
+
                 if not blocked then
                     if best.name ~= currentArea then
                         currentArea = best.name
@@ -497,9 +750,13 @@ task.spawn(function()
                         StatusLabel.Text = "Area: " .. best.name
                     end
                 else
+                    -- Farm di area sebelum target
                     local farmArea = nil
-                    for i = targetIdx-1, 1, -1 do
-                        if aura >= areas[i].req then farmArea = areas[i]; break end
+                    for i = targetIdx - 1, 1, -1 do
+                        if aura >= areas[i].req then
+                            farmArea = areas[i]
+                            break
+                        end
                     end
                     if farmArea and farmArea.name ~= currentArea then
                         currentArea = farmArea.name
@@ -534,29 +791,38 @@ end)
 task.spawn(function()
     while true do
         if autoCombo and comboTarget then
-            local aura      = getAura()
+            local aura = getAura()
             local rebirthAt = comboTarget.req * threshold
+
             if aura >= rebirthAt then
+                -- Rebirth!
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
                 rebirthDone = true
                 task.wait(2)
                 currentArea = nil
+
+                -- Auto-advance target kalau user tak pick sendiri
+                -- atau kalau userPickedTarget dah selesai (rebirthDone)
                 if not userPickedTarget then
+                    -- advance ke next area
                     local curIdx = getAreaIndex(comboTarget)
                     if curIdx < #areas then
-                        comboTarget = areas[curIdx+1]
-                        rebirthDone = false
+                        comboTarget = areas[curIdx + 1]
+                        rebirthDone = false  -- kena rebirth semula untuk target baru
                     end
+                    -- kalau dah max (Fallen Star), kekal & rebirth unlimited
                 else
+                    -- user dah manually pick, check kalau dah masuk target area
                     local newAura = getAura()
                     if newAura >= comboTarget.req then
+                        -- dah boleh masuk, advance auto
                         local curIdx = getAreaIndex(comboTarget)
                         if curIdx < #areas then
-                            comboTarget = areas[curIdx+1]
+                            comboTarget = areas[curIdx + 1]
                             rebirthDone = false
-                            userPickedTarget = false
+                            userPickedTarget = false  -- reset, bagi auto-advance balik
                         end
                     else
                         rebirthDone = false
@@ -570,11 +836,67 @@ task.spawn(function()
     end
 end)
 
+-- ─── Minimize ────────────────────────────────────────────────────────────────
+local minimized = false
+local fullH = PAD_TOP + y + 4
+Main.Size = UDim2.new(0, 210, 0, fullH)
+Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, 38)}):Play()
+        Content.Visible = false
+        MinBtn.Text = "□"
+    else
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, fullH)}):Play()
+        Content.Visible = true
+        MinBtn.Text = "—"
+    end
+end)
+
+-- ─── Close ───────────────────────────────────────────────────────────────────
+CloseBtn.MouseButton1Click:Connect(function()
+    autoTraining = false
+    autoRebirth  = false
+    autoCombo    = false
+    ScreenGui:Destroy()
+end)
+
+-- ─── Toggle Events ───────────────────────────────────────────────────────────
+TrainBtn.MouseButton1Click:Connect(function()
+    autoTraining = not autoTraining
+    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
+    if not autoTraining then
+        StatusLabel.Text = "Area: —"
+        currentArea = nil
+    end
+end)
+
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+end)
+
+ComboBtn.MouseButton1Click:Connect(function()
+    autoCombo = not autoCombo
+    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
+    if not autoCombo then
+        StatusLabel.Text = "Area: —"
+        currentArea = nil
+    end
+end)
+
 -- ─── Init ────────────────────────────────────────────────────────────────────
+-- Default target base on current aura (preview je, tak effect)
 local function initDefaultTarget()
     local aura = getAura()
     local next = getNextArea(aura)
-    comboTarget = next or areas[#areas]
+    if next then
+        comboTarget = next
+    else
+        comboTarget = areas[#areas]
+    end
     rebirthDone = false
     userPickedTarget = false
     updateStatus()
@@ -582,5 +904,4 @@ end
 
 initDefaultTarget()
 updateStatus()
-print("Auto Hub v3 NO-POPUP loaded!")
-
+print("Auto Hub v3 loaded!")
