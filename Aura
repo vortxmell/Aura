@@ -22,9 +22,18 @@ local rebirthCount = 0
 local threshold = 2
 
 local suffixes = {
-    {1e36, "Dc"}, {1e33, "No"}, {1e30, "Oc"}, {1e27, "Sp"},
-    {1e24, "Sx"}, {1e21, "Qi"}, {1e18, "Qa"}, {1e15, "T"},
-    {1e12, "B"},  {1e9,  "M"},  {1e6,  "K"},
+    {1e36, "Ud"},  -- Undecillion
+    {1e33, "Dc"},  -- Decillion
+    {1e30, "No"},  -- Nonillion
+    {1e27, "Oc"},  -- Octillion
+    {1e24, "Sp"},  -- Septillion
+    {1e21, "Sx"},  -- Sextillion
+    {1e18, "Qi"},  -- Quintillion
+    {1e15, "Qa"},  -- Quadrillion
+    {1e12, "T"},   -- Trillion
+    {1e9,  "B"},   -- Billion
+    {1e6,  "M"},   -- Million
+    {1e3,  "K"},   -- Thousand
 }
 
 local function formatNum(n)
