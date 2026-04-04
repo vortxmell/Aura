@@ -11,7 +11,7 @@ local areas = {
     {name = "Electra Field", req = 100e24,  pos = Vector3.new(72,    9,   104)},
     {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(70,   30,  -288)},
     {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-225,  9,    -6)},
-    {name = "Fallen Star",   req = 10e36,   pos = Vector3.new(326,  13,   150)},
+    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(326,  13,   150)},
 }
 
 local autoTraining = false
@@ -22,18 +22,19 @@ local rebirthCount = 0
 local threshold = 2
 
 local suffixes = {
-    {1e36, "Ud"},  -- Undecillion
-    {1e33, "Dc"},  -- Decillion
-    {1e30, "No"},  -- Nonillion
-    {1e27, "Oc"},  -- Octillion
-    {1e24, "Sp"},  -- Septillion
-    {1e21, "Sx"},  -- Sextillion
-    {1e18, "Qi"},  -- Quintillion
-    {1e15, "Qa"},  -- Quadrillion
-    {1e12, "T"},   -- Trillion
-    {1e9,  "B"},   -- Billion
-    {1e6,  "M"},   -- Million
-    {1e3,  "K"},   -- Thousand
+    {1e39, "Dd"},  -- tambah ni
+    {1e36, "Ud"},
+    {1e33, "Dc"},
+    {1e30, "No"},
+    {1e27, "Oc"},
+    {1e24, "Sp"},
+    {1e21, "Sx"},
+    {1e18, "Qi"},
+    {1e15, "Qa"},
+    {1e12, "T"},
+    {1e9,  "B"},
+    {1e6,  "M"},
+    {1e3,  "K"},
 }
 
 local function formatNum(n)
