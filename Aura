@@ -73,7 +73,6 @@ local function getAreaIndex(area)
 end
 
 local function formatThresh(n)
-    -- Show 1 decimal only if needed
     if n == math.floor(n) then
         return tostring(math.floor(n)) .. "x"
     else
@@ -88,11 +87,11 @@ local STAT_H  = 12
 local GAP     = 4
 local PAD_TOP = 38
 local PAD_X   = 12
+local MAX_H   = 420
 local WHITE   = Color3.fromRGB(255, 255, 255)
-local DIM     = Color3.fromRGB(120, 110, 140)
+local DIM     = Color3.fromRGB(180, 175, 200)
 local PURPLE  = Color3.fromRGB(110, 70, 200)
 local WARN    = Color3.fromRGB(255, 180, 60)
-local GREEN   = Color3.fromRGB(80, 200, 120)
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
@@ -109,16 +108,18 @@ Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
 Main.Active = true
-Main.Draggable = true
+Main.Draggable = false
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = Color3.fromRGB(80, 60, 120)
 MainStroke.Thickness = 1
 
+-- Title Bar
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 36)
 TitleBar.BackgroundTransparency = 1
+TitleBar.Active = true
 TitleBar.Parent = Main
 
 local Title = Instance.new("TextLabel")
@@ -156,6 +157,33 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
+-- Manual drag via TitleBar
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+TitleBar.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+TitleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
 local TitleDiv = Instance.new("Frame")
 TitleDiv.Size = UDim2.new(0.85, 0, 0, 1)
 TitleDiv.Position = UDim2.new(0.075, 0, 0, 36)
@@ -163,16 +191,19 @@ TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TitleDiv.BorderSizePixel = 0
 TitleDiv.Parent = Main
 
+-- Scrollable Content
 local Content = Instance.new("ScrollingFrame")
 Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
 Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
 Content.BackgroundTransparency = 1
 Content.BorderSizePixel = 0
 Content.ScrollBarThickness = 2
-Content.ScrollBarImageColor3 = Color3.fromRGB(110, 70, 200)
-Content.CanvasSize = UDim2.new(0, 0, 0, 0) -- akan update lepas build
+Content.ScrollBarImageColor3 = PURPLE
+Content.CanvasSize = UDim2.new(0, 0, 0, 0)
 Content.ScrollingDirection = Enum.ScrollingDirection.Y
+Content.ElasticBehavior = Enum.ElasticBehavior.Never
 Content.Parent = Main
+
 local y = GAP
 local function nextY(h) local c=y; y=y+h+GAP; return c end
 
@@ -191,7 +222,7 @@ local function makeStatusLabel(text, color)
     l.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
     l.BackgroundTransparency = 1
     l.Text = text
-    l.TextColor3 = color or Color3.fromRGB(140, 130, 160)
+    l.TextColor3 = color or WHITE
     l.TextSize = 9
     l.Font = Enum.Font.Gotham
     l.TextXAlignment = Enum.TextXAlignment.Left
@@ -205,7 +236,7 @@ local function makeSection(text)
     l.Position = UDim2.new(0, PAD_X+2, 0, nextY(SEC_H))
     l.BackgroundTransparency = 1
     l.Text = text
-    l.TextColor3 = Color3.fromRGB(100, 90, 130)
+    l.TextColor3 = WHITE
     l.TextSize = 8
     l.Font = Enum.Font.GothamBold
     l.TextXAlignment = Enum.TextXAlignment.Left
@@ -229,7 +260,7 @@ local function makeToggleRow(labelText)
     Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = labelText
-    Label.TextColor3 = Color3.fromRGB(200, 195, 215)
+    Label.TextColor3 = WHITE
     Label.TextSize = 10
     Label.Font = Enum.Font.GothamBold
     Label.TextXAlignment = Enum.TextXAlignment.Left
@@ -256,8 +287,7 @@ local function makeToggleRow(labelText)
     return Hitbox, Pill, Dot, BtnStroke
 end
 
--- Input row with +/- buttons and TextBox
-local function makeInputRow(labelText, defaultVal, step, isFloat)
+local function makeInputRow(labelText, defaultVal, step)
     local rowY = nextY(ROW_H)
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
@@ -269,61 +299,54 @@ local function makeInputRow(labelText, defaultVal, step, isFloat)
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
     TStroke.Thickness = 1
-
     local TLabel = Instance.new("TextLabel")
     TLabel.Size = UDim2.new(0.42, 0, 1, 0)
     TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
     TLabel.Text = labelText
-    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextColor3 = WHITE
     TLabel.TextSize = 10
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
     TLabel.Parent = TFrame
-
     local MinusB = Instance.new("TextButton")
     MinusB.Size = UDim2.new(0, 16, 0, 14)
     MinusB.Position = UDim2.new(1, -76, 0.5, -7)
     MinusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     MinusB.BorderSizePixel = 0
     MinusB.Text = "−"
-    MinusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    MinusB.TextColor3 = WHITE
     MinusB.TextSize = 11
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
     Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
-
-    -- TextBox untuk input
     local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 38, 0, 14)
     InputBox.Position = UDim2.new(1, -58, 0.5, -7)
     InputBox.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
     InputBox.BorderSizePixel = 0
     InputBox.Text = formatThresh(defaultVal)
-    InputBox.TextColor3 = Color3.fromRGB(180, 150, 255)
+    InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
     InputBox.ClearTextOnFocus = true
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
-
     local PlusB = Instance.new("TextButton")
     PlusB.Size = UDim2.new(0, 16, 0, 14)
     PlusB.Position = UDim2.new(1, -18, 0.5, -7)
     PlusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     PlusB.BorderSizePixel = 0
     PlusB.Text = "+"
-    PlusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    PlusB.TextColor3 = WHITE
     PlusB.TextSize = 11
     PlusB.Font = Enum.Font.GothamBold
     PlusB.Parent = TFrame
     Instance.new("UICorner", PlusB).CornerRadius = UDim.new(1, 0)
-
     return MinusB, InputBox, PlusB, TStroke
 end
 
--- Input row with toggle pill
-local function makeInputToggleRow(labelText, defaultVal, step, isFloat)
+local function makeInputToggleRow(labelText, defaultVal)
     local rowY = nextY(ROW_H)
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
@@ -335,19 +358,16 @@ local function makeInputToggleRow(labelText, defaultVal, step, isFloat)
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
     TStroke.Thickness = 1
-
     local TLabel = Instance.new("TextLabel")
     TLabel.Size = UDim2.new(0.3, 0, 1, 0)
     TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
     TLabel.Text = labelText
-    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextColor3 = WHITE
     TLabel.TextSize = 10
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
     TLabel.Parent = TFrame
-
-    -- Toggle pill (kiri)
     local Pill = Instance.new("Frame")
     Pill.Size = UDim2.new(0, 28, 0, 14)
     Pill.Position = UDim2.new(0, 72, 0.5, -7)
@@ -367,44 +387,40 @@ local function makeInputToggleRow(labelText, defaultVal, step, isFloat)
     PillHitbox.BackgroundTransparency = 1
     PillHitbox.Text = ""
     PillHitbox.Parent = Pill
-
     local MinusB = Instance.new("TextButton")
     MinusB.Size = UDim2.new(0, 16, 0, 14)
     MinusB.Position = UDim2.new(1, -76, 0.5, -7)
     MinusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     MinusB.BorderSizePixel = 0
     MinusB.Text = "−"
-    MinusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    MinusB.TextColor3 = WHITE
     MinusB.TextSize = 11
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
     Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
-
     local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 38, 0, 14)
     InputBox.Position = UDim2.new(1, -58, 0.5, -7)
     InputBox.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
     InputBox.BorderSizePixel = 0
     InputBox.Text = formatThresh(defaultVal)
-    InputBox.TextColor3 = Color3.fromRGB(180, 150, 255)
+    InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
     InputBox.ClearTextOnFocus = true
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
-
     local PlusB = Instance.new("TextButton")
     PlusB.Size = UDim2.new(0, 16, 0, 14)
     PlusB.Position = UDim2.new(1, -18, 0.5, -7)
     PlusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     PlusB.BorderSizePixel = 0
     PlusB.Text = "+"
-    PlusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    PlusB.TextColor3 = WHITE
     PlusB.TextSize = 11
     PlusB.Font = Enum.Font.GothamBold
     PlusB.Parent = TFrame
     Instance.new("UICorner", PlusB).CornerRadius = UDim.new(1, 0)
-
     return PillHitbox, Pill, PillDot, TStroke, MinusB, InputBox, PlusB
 end
 
@@ -425,7 +441,7 @@ local function makeTargetRow()
     TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
     TLabel.Text = "Rebirth Target"
-    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextColor3 = WHITE
     TLabel.TextSize = 9
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -435,7 +451,7 @@ local function makeTargetRow()
     TVal.Position = UDim2.new(0.45, 0, 0, 0)
     TVal.BackgroundTransparency = 1
     TVal.Text = "—"
-    TVal.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TVal.TextColor3 = WHITE
     TVal.TextSize = 9
     TVal.Font = Enum.Font.Gotham
     TVal.TextXAlignment = Enum.TextXAlignment.Right
@@ -445,7 +461,7 @@ local function makeTargetRow()
     Arrow.Position = UDim2.new(1, -12, 0, 0)
     Arrow.BackgroundTransparency = 1
     Arrow.Text = "›"
-    Arrow.TextColor3 = DIM
+    Arrow.TextColor3 = WHITE
     Arrow.TextSize = 12
     Arrow.Font = Enum.Font.GothamBold
     Arrow.Parent = TFrame
@@ -467,8 +483,8 @@ makeDivider()
 makeSection("COMBO")
 local ComboBtn,  ComboPill,  ComboDot,  ComboStroke  = makeToggleRow("Train + Rebirth")
 local TargetBtn, TargetVal,  TargetStroke             = makeTargetRow()
-local ThreshMinus, ThreshBox, ThreshPlus, ThreshStroke = makeInputRow("Threshold", threshold, 1, false)
-local MultHitbox, MultPill, MultDot, MultStroke, MultMinus, MultBox, MultPlus = makeInputToggleRow("Multiplier", multiplier, 0.5, true)
+local ThreshMinus, ThreshBox, ThreshPlus, ThreshStroke = makeInputRow("Threshold", threshold, 1)
+local MultHitbox, MultPill, MultDot, MultStroke, MultMinus, MultBox, MultPlus = makeInputToggleRow("Multiplier", multiplier)
 makeDivider()
 local RebirthTargetLabel = makeStatusLabel("Rebirth at: —")
 local ReqLabel           = makeStatusLabel("Target req: —")
@@ -478,11 +494,10 @@ makeDivider()
 makeSection("UTILITY")
 local ZoneBtn, ZonePill, ZoneDot, ZoneStroke = makeToggleRow("Zone Guard")
 
-local fullH = PAD_TOP + y + 4
-Content.CanvasSize = UDim2.new(0, 0, 0, y + 4)
--- Cap main frame height supaya tak terlalu panjang
-local maxH = 400  -- max height GUI
-fullH = math.min(PAD_TOP + y + 4, maxH + PAD_TOP)
+-- Set canvas and frame size
+local contentH = y + 4
+Content.CanvasSize = UDim2.new(0, 0, 0, contentH)
+local fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 220, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
@@ -573,7 +588,7 @@ for i, area in ipairs(areas) do
     ReqLbl.Position = UDim2.new(0.6, 0, 0, 0)
     ReqLbl.BackgroundTransparency = 1
     ReqLbl.Text = formatNum(area.req)
-    ReqLbl.TextColor3 = DIM
+    ReqLbl.TextColor3 = WHITE
     ReqLbl.TextSize = 9
     ReqLbl.Font = Enum.Font.Gotham
     ReqLbl.TextXAlignment = Enum.TextXAlignment.Right
@@ -631,10 +646,8 @@ local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
 
 -- Status update
 local function updateStatus()
-    -- Update area label dari server attribute
     local serverArea = player:GetAttribute("CurrentArea") or ""
     StatusLabel.Text = "Area: " .. (serverArea ~= "" and serverArea or "—")
-
     if comboTarget then
         TargetVal.Text          = comboTarget.name
         local rebirthAt         = comboTarget.req * threshold
@@ -657,7 +670,7 @@ local function refreshPopupItems()
         item.frame.BackgroundTransparency = isSel and 0 or 1
         item.frame.BackgroundColor3 = isSel and Color3.fromRGB(50,35,80) or Color3.fromRGB(25,20,38)
         item.dot.BackgroundColor3 = isSel and PURPLE or DIM
-        item.nameLbl.TextColor3 = isSel and WHITE or Color3.fromRGB(180,175,200)
+        item.nameLbl.TextColor3 = WHITE
         item.checkLbl.Text = isCurrent and "✓" or ""
     end
 end
@@ -711,12 +724,10 @@ local function setToggle(pill, dot, stroke, on)
     end
 end
 
--- Threshold input logic
+-- Threshold logic
 local function applyThreshold(val)
     local n = tonumber(val)
-    if n and n > 0 then
-        threshold = math.max(0.5, n)
-    end
+    if n and n > 0 then threshold = math.max(0.5, n) end
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end
@@ -731,16 +742,12 @@ ThreshPlus.MouseButton1Click:Connect(function()
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
-ThreshBox.FocusLost:Connect(function()
-    applyThreshold(ThreshBox.Text)
-end)
+ThreshBox.FocusLost:Connect(function() applyThreshold(ThreshBox.Text) end)
 
--- Multiplier input logic
+-- Multiplier logic
 local function applyMultiplier(val)
     local n = tonumber(val)
-    if n and n > 0 then
-        multiplier = math.max(0.5, n)
-    end
+    if n and n > 0 then multiplier = math.max(0.5, n) end
     MultBox.Text = formatThresh(multiplier)
 end
 
@@ -752,11 +759,7 @@ MultPlus.MouseButton1Click:Connect(function()
     multiplier = multiplier + 0.5
     MultBox.Text = formatThresh(multiplier)
 end)
-MultBox.FocusLost:Connect(function()
-    applyMultiplier(MultBox.Text)
-end)
-
--- Multiplier toggle
+MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
 MultHitbox.MouseButton1Click:Connect(function()
     multiplierOn = not multiplierOn
     setToggle(MultPill, MultDot, MultStroke, multiplierOn)
@@ -830,11 +833,9 @@ task.spawn(function()
         if (autoTraining or autoCombo) and not isRebirthing then
             local aura = getAura()
             local best = getBestArea(aura)
-            if best then
-                if best.name ~= currentArea then
-                    currentArea = best.name
-                    teleport(best.pos)
-                end
+            if best and best.name ~= currentArea then
+                currentArea = best.name
+                teleport(best.pos)
             end
         end
         task.wait(5)
@@ -861,24 +862,18 @@ task.spawn(function()
         if autoCombo and comboTarget then
             local aura      = getAura()
             local rebirthAt = comboTarget.req * threshold
-
             if aura >= rebirthAt then
                 isRebirthing = true
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
-
-                -- Apply multiplier if on
                 if multiplierOn then
                     threshold = threshold * multiplier
                     ThreshBox.Text = formatThresh(threshold)
                 end
-
                 task.wait(2)
                 isRebirthing = false
                 currentArea = nil
-
-                -- Auto advance target
                 local curIdx = getAreaIndex(comboTarget)
                 if curIdx < #areas then
                     comboTarget = areas[curIdx + 1]
@@ -896,7 +891,6 @@ task.spawn(function()
         if zoneGuard and not isRebirthing then
             local serverArea = player:GetAttribute("CurrentArea") or ""
             if serverArea == "" then
-                -- Terkeluar dari area, teleport balik
                 local best = getBestArea(getAura())
                 if best then
                     teleport(best.pos)
