@@ -81,7 +81,12 @@ ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
-ScreenGui.Parent = player.PlayerGui
+local ok, err = pcall(function()
+    ScreenGui.Parent = game:GetService("CoreGui")
+end)
+if not ok then
+    ScreenGui.Parent = player.PlayerGui
+end
 
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 210, 0, 300)
