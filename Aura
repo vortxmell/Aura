@@ -727,18 +727,18 @@ end
 -- Threshold logic
 local function applyThreshold(val)
     local n = tonumber(val)
-    if n and n > 0 then threshold = math.max(0.5, n) end
+    if n and n > 0 then threshold = math.max(0.1, n) end
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end
 
 ThreshMinus.MouseButton1Click:Connect(function()
-    threshold = math.max(0.5, threshold - 1)
+    threshold = math.max(0.1, math.round((threshold - 0.1) * 10) / 10)
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
 ThreshPlus.MouseButton1Click:Connect(function()
-    threshold = threshold + 1
+    threshold = math.round((threshold + 0.1) * 10) / 10
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
