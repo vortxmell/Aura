@@ -733,12 +733,12 @@ local function applyThreshold(val)
 end
 
 ThreshMinus.MouseButton1Click:Connect(function()
-    threshold = math.max(0.1, math.round((threshold - 0.1) * 10) / 10)
+    threshold = math.max(0.1, math.floor((threshold - 0.1) * 10 + 0.5) / 10)
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
 ThreshPlus.MouseButton1Click:Connect(function()
-    threshold = math.round((threshold + 0.1) * 10) / 10
+    threshold = math.floor((threshold + 0.1) * 10 + 0.5) / 10
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
