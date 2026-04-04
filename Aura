@@ -329,6 +329,7 @@ local function makeInputRow(labelText, defaultVal, step)
     InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
+    -- ClearTextOnFocus removed (TextLabel)
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
     local PlusB = Instance.new("TextButton")
@@ -406,7 +407,7 @@ local function makeInputToggleRow(labelText, defaultVal)
     InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
-    InputBox.ClearTextOnFocus = true
+    -- ClearTextOnFocus removed (TextLabel)
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
     local PlusB = Instance.new("TextButton")
@@ -741,7 +742,7 @@ ThreshPlus.MouseButton1Click:Connect(function()
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
--- ThreshBox is TextLabel, no FocusLost needed
+-- ThreshBox is TextLabel, FocusLost removed
 
 -- Multiplier logic
 local function applyMultiplier(val)
