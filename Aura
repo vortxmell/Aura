@@ -163,13 +163,16 @@ TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TitleDiv.BorderSizePixel = 0
 TitleDiv.Parent = Main
 
-local Content = Instance.new("Frame")
+local Content = Instance.new("ScrollingFrame")
 Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
 Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
 Content.BackgroundTransparency = 1
-Content.ClipsDescendants = true
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 2
+Content.ScrollBarImageColor3 = Color3.fromRGB(110, 70, 200)
+Content.CanvasSize = UDim2.new(0, 0, 0, 0) -- akan update lepas build
+Content.ScrollingDirection = Enum.ScrollingDirection.Y
 Content.Parent = Main
-
 local y = GAP
 local function nextY(h) local c=y; y=y+h+GAP; return c end
 
@@ -476,6 +479,10 @@ makeSection("UTILITY")
 local ZoneBtn, ZonePill, ZoneDot, ZoneStroke = makeToggleRow("Zone Guard")
 
 local fullH = PAD_TOP + y + 4
+Content.CanvasSize = UDim2.new(0, 0, 0, y + 4)
+-- Cap main frame height supaya tak terlalu panjang
+local maxH = 400  -- max height GUI
+fullH = math.min(PAD_TOP + y + 4, maxH + PAD_TOP)
 Main.Size = UDim2.new(0, 220, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
