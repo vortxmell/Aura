@@ -15,15 +15,13 @@ local areas = {
     {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(321,  14,   112)},
 }
 
-local autoTraining    = false
-local autoRebirth     = false
-local autoCombo       = false
-local currentArea     = nil
-local rebirthCount    = 0
-local threshold       = 2
-local comboTarget     = nil
-local rebirthDone     = false
-local userPickedTarget = false
+local autoTraining  = false
+local autoRebirth   = false
+local autoCombo     = false
+local currentArea   = nil
+local rebirthCount  = 0
+local threshold     = 2
+local comboTarget   = nil
 
 local suffixes = {
     {1e39,"Dd"},{1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
@@ -81,12 +79,8 @@ ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
-local ok, err = pcall(function()
-    ScreenGui.Parent = game:GetService("CoreGui")
-end)
-if not ok then
-    ScreenGui.Parent = player.PlayerGui
-end
+local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ok then ScreenGui.Parent = player.PlayerGui end
 
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 210, 0, 300)
@@ -311,9 +305,9 @@ local function makeTargetRow()
     TLabel.Size = UDim2.new(0.45, 0, 1, 0)
     TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
-    TLabel.Text = "Target"
+    TLabel.Text = "Rebirth Target"
     TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
-    TLabel.TextSize = 10
+    TLabel.TextSize = 9
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
     TLabel.Parent = TFrame
@@ -356,11 +350,10 @@ local ComboBtn,  ComboPill,  ComboDot,  ComboStroke  = makeToggleRow("Train + Re
 local TargetBtn, TargetVal,  TargetStroke             = makeTargetRow()
 local MinusBtn,  ThreshValue, PlusBtn                 = makeThresholdRow()
 makeDivider()
-local NextAreaLabel  = makeStatusLabel("Target: —")
-local ReqLabel       = makeStatusLabel("Req: —")
-local RebirthAtLabel = makeStatusLabel("Rebirth at: —")
-local WarnLabel      = makeStatusLabel("", WARN)
-local RebirthLabel   = makeStatusLabel("Rebirths: 0")
+local RebirthTargetLabel = makeStatusLabel("Rebirth at: —")
+local ReqLabel           = makeStatusLabel("Target req: —")
+local WarnLabel          = makeStatusLabel("", WARN)
+local RebirthLabel       = makeStatusLabel("Rebirths: 0")
 
 local fullH = PAD_TOP + y + 4
 Main.Size = UDim2.new(0, 210, 0, fullH)
@@ -371,7 +364,6 @@ local POPUP_W      = 190
 local POPUP_ITEM_H = 20
 local POPUP_H      = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
 
--- FIX: Backdrop jadi TextButton supaya block clicks betul
 local Backdrop = Instance.new("TextButton")
 Backdrop.Size = UDim2.new(1, 0, 1, 0)
 Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -399,7 +391,7 @@ local PopupTitle = Instance.new("TextLabel")
 PopupTitle.Size = UDim2.new(1, -20, 0, 28)
 PopupTitle.Position = UDim2.new(0, 10, 0, 4)
 PopupTitle.BackgroundTransparency = 1
-PopupTitle.Text = "Select Target Area"
+PopupTitle.Text = "Select Rebirth Target"
 PopupTitle.TextColor3 = WHITE
 PopupTitle.TextSize = 11
 PopupTitle.Font = Enum.Font.GothamBold
@@ -460,39 +452,28 @@ for i, area in ipairs(areas) do
     ReqLbl.TextXAlignment = Enum.TextXAlignment.Right
     ReqLbl.ZIndex = 13
     ReqLbl.Parent = Item
-    local WarnIcon = Instance.new("TextLabel")
-    WarnIcon.Size = UDim2.new(0, 14, 1, 0)
-    WarnIcon.Position = UDim2.new(1, -16, 0, 0)
-    WarnIcon.BackgroundTransparency = 1
-    WarnIcon.Text = ""
-    WarnIcon.TextColor3 = WARN
-    WarnIcon.TextSize = 10
-    WarnIcon.Font = Enum.Font.GothamBold
-    WarnIcon.ZIndex = 13
-    WarnIcon.Parent = Item
+    local CheckLbl = Instance.new("TextLabel")
+    CheckLbl.Size = UDim2.new(0, 14, 1, 0)
+    CheckLbl.Position = UDim2.new(1, -16, 0, 0)
+    CheckLbl.BackgroundTransparency = 1
+    CheckLbl.Text = ""
+    CheckLbl.TextColor3 = Color3.fromRGB(100, 220, 100)
+    CheckLbl.TextSize = 10
+    CheckLbl.Font = Enum.Font.GothamBold
+    CheckLbl.ZIndex = 13
+    CheckLbl.Parent = Item
     local Hitbox = Instance.new("TextButton")
     Hitbox.Size = UDim2.new(1, 0, 1, 0)
     Hitbox.BackgroundTransparency = 1
     Hitbox.Text = ""
     Hitbox.ZIndex = 14
     Hitbox.Parent = Item
-    popupItems[i] = {frame=Item, dot=ItemDot, nameLbl=NameLbl, reqLbl=ReqLbl, warnIcon=WarnIcon, hitbox=Hitbox, area=area}
+    popupItems[i] = {frame=Item, dot=ItemDot, nameLbl=NameLbl, reqLbl=ReqLbl, checkLbl=CheckLbl, hitbox=Hitbox, area=area}
 end
 
 local bottomY = listStartY + (#areas * (POPUP_ITEM_H + 2)) + 4
-local PopupWarnLabel = Instance.new("TextLabel")
-PopupWarnLabel.Size = UDim2.new(1, -16, 0, 14)
-PopupWarnLabel.Position = UDim2.new(0, 8, 0, bottomY)
-PopupWarnLabel.BackgroundTransparency = 1
-PopupWarnLabel.Text = ""
-PopupWarnLabel.TextColor3 = WARN
-PopupWarnLabel.TextSize = 9
-PopupWarnLabel.Font = Enum.Font.Gotham
-PopupWarnLabel.TextXAlignment = Enum.TextXAlignment.Left
-PopupWarnLabel.ZIndex = 12
-PopupWarnLabel.Parent = Popup
+local btnY = bottomY + 4
 
-local btnY = bottomY + 16
 local CancelBtn = Instance.new("TextButton")
 CancelBtn.Size = UDim2.new(0.44, 0, 0, 22)
 CancelBtn.Position = UDim2.new(0.04, 0, 0, btnY)
@@ -519,27 +500,35 @@ SetBtn.ZIndex = 12
 SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0, 6)
 
--- Popup logic
+-- Tween info
 local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
 
+-- Status update
+local function updateStatus()
+    if comboTarget then
+        TargetVal.Text         = comboTarget.name
+        local rebirthAt        = comboTarget.req * threshold
+        ReqLabel.Text          = "Target req: " .. formatNum(comboTarget.req)
+        RebirthTargetLabel.Text = "Rebirth at: " .. formatNum(rebirthAt)
+        WarnLabel.Text         = getAura() >= comboTarget.req * threshold and "⚠ Sedia untuk rebirth!" or ""
+    else
+        TargetVal.Text          = "—"
+        ReqLabel.Text           = "Target req: —"
+        RebirthTargetLabel.Text = "Rebirth at: —"
+        WarnLabel.Text          = ""
+    end
+end
+
+-- Popup logic
 local function refreshPopupItems()
-    local aura = getAura()
     for i, item in ipairs(popupItems) do
-        local isPast    = aura >= item.area.req
         local isSel     = selectedInPopup == i
         local isCurrent = comboTarget and comboTarget.name == item.area.name
         item.frame.BackgroundTransparency = isSel and 0 or 1
         item.frame.BackgroundColor3 = isSel and Color3.fromRGB(50,35,80) or Color3.fromRGB(25,20,38)
-        item.dot.BackgroundColor3 = isSel and PURPLE or (isPast and WARN or DIM)
-        item.nameLbl.TextColor3 = isPast and WARN or WHITE
-        item.warnIcon.Text = isPast and "⚠" or (isCurrent and "✓" or "")
-        item.warnIcon.TextColor3 = isPast and WARN or Color3.fromRGB(100,220,100)
-        item.reqLbl.TextColor3 = isPast and WARN or DIM
-    end
-    if selectedInPopup and getAura() >= areas[selectedInPopup].req then
-        PopupWarnLabel.Text = "⚠ Aura dah lepas target ni"
-    else
-        PopupWarnLabel.Text = ""
+        item.dot.BackgroundColor3 = isSel and PURPLE or DIM
+        item.nameLbl.TextColor3 = isSel and WHITE or Color3.fromRGB(180,175,200)
+        item.checkLbl.Text = isCurrent and "✓" or ""
     end
 end
 
@@ -559,7 +548,6 @@ local function closePopup()
     Backdrop.Visible = false
     Popup.Visible = false
     selectedInPopup = nil
-    PopupWarnLabel.Text = ""
 end
 
 for i, item in ipairs(popupItems) do
@@ -576,8 +564,6 @@ TargetBtn.MouseButton1Click:Connect(openPopup)
 SetBtn.MouseButton1Click:Connect(function()
     if not selectedInPopup then closePopup(); return end
     comboTarget = areas[selectedInPopup]
-    userPickedTarget = true
-    rebirthDone = false
     updateStatus()
     closePopup()
 end)
@@ -592,24 +578,6 @@ local function setToggle(pill, dot, stroke, on)
         TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
         TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
-    end
-end
-
--- Status update
-function updateStatus()
-    if comboTarget then
-        TargetVal.Text      = comboTarget.name
-        local rebirthAt     = comboTarget.req * threshold
-        NextAreaLabel.Text  = "Target: " .. comboTarget.name
-        ReqLabel.Text       = "Req: "    .. formatNum(comboTarget.req)
-        RebirthAtLabel.Text = "Rebirth at: " .. formatNum(rebirthAt)
-        WarnLabel.Text      = getAura() >= comboTarget.req and "⚠ Aura dah lepas target" or ""
-    else
-        TargetVal.Text      = "—"
-        NextAreaLabel.Text  = "Target: —"
-        ReqLabel.Text       = "Req: —"
-        RebirthAtLabel.Text = "Rebirth at: —"
-        WarnLabel.Text      = ""
     end
 end
 
@@ -655,7 +623,10 @@ end)
 ComboBtn.MouseButton1Click:Connect(function()
     autoCombo = not autoCombo
     setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
-    if not autoCombo then StatusLabel.Text = "Area: —"; currentArea = nil end
+    if not autoCombo then
+        StatusLabel.Text = "Area: —"
+        currentArea = nil
+    end
 end)
 
 -- Respawn
@@ -663,43 +634,25 @@ player.CharacterAdded:Connect(function()
     task.wait(3)
     if autoTraining or autoCombo then
         local best = getBestArea(getAura())
-        if autoCombo and comboTarget and not rebirthDone then
-            local targetIdx = getAreaIndex(comboTarget)
-            if best and getAreaIndex(best) < targetIdx then
-                teleport(best.pos); currentArea = best.name
-                StatusLabel.Text = "Area: " .. best.name
-            end
-        elseif best then
-            teleport(best.pos); currentArea = best.name
+        if best then
+            teleport(best.pos)
+            currentArea = best.name
             StatusLabel.Text = "Area: " .. best.name
         end
     end
 end)
 
--- Auto Training loop
+-- Auto Training loop — bebas ikut aura, tak kena affect oleh combo
 task.spawn(function()
     while true do
         if autoTraining or autoCombo then
             local aura = getAura()
             local best = getBestArea(aura)
             if best then
-                local targetIdx = comboTarget and getAreaIndex(comboTarget) or 999
-                local bestIdx   = getAreaIndex(best)
-                local blocked   = autoCombo and comboTarget and not rebirthDone and bestIdx >= targetIdx
-                if not blocked then
-                    if best.name ~= currentArea then
-                        currentArea = best.name; teleport(best.pos)
-                        StatusLabel.Text = "Area: " .. best.name
-                    end
-                else
-                    local farmArea = nil
-                    for i = targetIdx-1, 1, -1 do
-                        if aura >= areas[i].req then farmArea = areas[i]; break end
-                    end
-                    if farmArea and farmArea.name ~= currentArea then
-                        currentArea = farmArea.name; teleport(farmArea.pos)
-                        StatusLabel.Text = "Area: " .. farmArea.name .. " (farming)"
-                    end
+                if best.name ~= currentArea then
+                    currentArea = best.name
+                    teleport(best.pos)
+                    StatusLabel.Text = "Area: " .. best.name
                 end
             else
                 StatusLabel.Text = "Area: Belum cukup aura"
@@ -724,37 +677,27 @@ task.spawn(function()
     end
 end)
 
--- Combo loop
+-- Combo loop — rebirth ikut target, auto advance lepas rebirth
 task.spawn(function()
     while true do
         if autoCombo and comboTarget then
             local aura      = getAura()
             local rebirthAt = comboTarget.req * threshold
+
             if aura >= rebirthAt then
+                -- Rebirth!
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
-                rebirthDone = true
                 task.wait(2)
                 currentArea = nil
-                if not userPickedTarget then
-                    local curIdx = getAreaIndex(comboTarget)
-                    if curIdx < #areas then
-                        comboTarget = areas[curIdx+1]
-                        rebirthDone = false
-                    end
+
+                -- Auto advance target ke next area
+                local curIdx = getAreaIndex(comboTarget)
+                if curIdx < #areas then
+                    comboTarget = areas[curIdx + 1]
                 else
-                    if getAura() >= comboTarget.req then
-                        local curIdx = getAreaIndex(comboTarget)
-                        if curIdx < #areas then
-                            comboTarget = areas[curIdx+1]
-                            rebirthDone = false
-                            userPickedTarget = false
-                        end
-                    else
-                        rebirthDone = false
-                        userPickedTarget = false
-                    end
+                    -- Max area, kekal Fallen Star, rebirth unlimited
                 end
                 updateStatus()
             end
@@ -763,12 +706,10 @@ task.spawn(function()
     end
 end)
 
--- Init
+-- Init default target = next area dari aura semasa
 local function initDefaultTarget()
     local next = getNextArea(getAura())
     comboTarget = next or areas[#areas]
-    rebirthDone = false
-    userPickedTarget = false
     updateStatus()
 end
 
