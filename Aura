@@ -80,6 +80,7 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = player.PlayerGui
 
 local Main = Instance.new("Frame")
