@@ -77,6 +77,9 @@ local function getAreaIndex(area)
     return 0
 end
 
+-- ─── Tween Info (declare early, used throughout) ─────────────────────────────
+local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
 -- ─── GUI Constants ────────────────────────────────────────────────────────────
 local ROW_H   = 16
 local SEC_H   = 12
@@ -104,19 +107,28 @@ Main.Position = UDim2.new(0, 16, 0.5, -150)
 Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
-Main.Active = true
-Main.Draggable = true
+Main.Active = false
+Main.Draggable = false
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = Color3.fromRGB(80, 60, 120)
 MainStroke.Thickness = 1
 
--- Title Bar
+-- Title Bar (visual only, no interactivity)
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 36)
 TitleBar.BackgroundTransparency = 1
 TitleBar.Parent = Main
+
+-- Drag handle - invisible TextButton covering title area (excludes buttons on right)
+local DragHandle = Instance.new("TextButton")
+DragHandle.Size = UDim2.new(1, -60, 1, 0)
+DragHandle.Position = UDim2.new(0, 0, 0, 0)
+DragHandle.BackgroundTransparency = 1
+DragHandle.Text = ""
+DragHandle.ZIndex = 2
+DragHandle.Parent = TitleBar
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -70, 1, 0)
@@ -127,6 +139,7 @@ Title.TextColor3 = WHITE
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 2
 Title.Parent = TitleBar
 
 local MinBtn = Instance.new("TextButton")
@@ -138,19 +151,21 @@ MinBtn.Text = "—"
 MinBtn.TextColor3 = WHITE
 MinBtn.TextSize = 10
 MinBtn.Font = Enum.Font.GothamBold
-MinBtn.Parent = TitleBar
+MinBtn.ZIndex = 5
+MinBtn.Parent = Main
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 22, 0, 22)
-CloseBtn.Position = UDim2.new(1, -26, 0.5, -11)
+CloseBtn.Position = UDim2.new(1, -26, 0, 7)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = WHITE
 CloseBtn.TextSize = 10
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = TitleBar
+CloseBtn.ZIndex = 5
+CloseBtn.Parent = Main
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
 local TitleDiv = Instance.new("Frame")
@@ -159,6 +174,34 @@ TitleDiv.Position = UDim2.new(0.075, 0, 0, 36)
 TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TitleDiv.BorderSizePixel = 0
 TitleDiv.Parent = Main
+
+-- ─── Drag Logic ──────────────────────────────────────────────────────────────
+local dragging = false
+local dragStart, startPos
+
+DragHandle.MouseButton1Down:Connect(function(x, y)
+    dragging = true
+    dragStart = Vector2.new(x, y)
+    startPos = Main.Position
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or
+       dragging and input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - Vector3.new(dragStart.X, dragStart.Y, 0)
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
 
 -- ─── Content ─────────────────────────────────────────────────────────────────
 local Content = Instance.new("Frame")
@@ -574,7 +617,6 @@ SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0, 6)
 
 -- ─── Popup Logic ─────────────────────────────────────────────────────────────
-local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
 
 local function refreshPopupItems()
     local aura = getAura()
