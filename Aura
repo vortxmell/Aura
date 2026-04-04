@@ -26,7 +26,6 @@ local autoRebirth   = false
 local autoCombo     = false
 local currentArea   = nil
 local rebirthCount  = 0
-local isRebirthing  = false
 local threshold     = 2
 local comboTarget   = nil
 
@@ -673,7 +672,7 @@ end)
 -- Auto Rebirth loop
 task.spawn(function()
     while true do
-        if (autoTraining or autoCombo) and not isRebirthing then
+        if autoTraining or autoCombo then
             RequestRebirth:InvokeServer()
             rebirthCount += 1
             RebirthLabel.Text = "Rebirths: " .. rebirthCount
@@ -692,13 +691,11 @@ task.spawn(function()
             local rebirthAt = comboTarget.req * threshold
 
             if aura >= rebirthAt then
-                isRebirthing = true
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
                 task.wait(2)
-                isRebirthing = false
-                currentArea = nil
+               currentArea = nil
 
                 -- Auto advance target ke next area
                 local curIdx = getAreaIndex(comboTarget)
