@@ -439,13 +439,15 @@ local POPUP_W = 190
 local POPUP_ITEM_H = 20
 local POPUP_H = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
 
-local Backdrop = Instance.new("Frame")
+local Backdrop = Instance.new("TextButton")
 Backdrop.Size = UDim2.new(1, 0, 1, 0)
 Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 Backdrop.BackgroundTransparency = 0.5
 Backdrop.BorderSizePixel = 0
+Backdrop.Text = ""
 Backdrop.ZIndex = 10
 Backdrop.Visible = false
+Backdrop.Active = false
 Backdrop.Parent = ScreenGui
 
 local Popup = Instance.new("Frame")
@@ -659,7 +661,6 @@ local function refreshPopupItems()
 end
 
 local function openPopup()
-    -- set selectedInPopup to current comboTarget index
     selectedInPopup = nil
     if comboTarget then
         for i, a in ipairs(areas) do
@@ -670,11 +671,13 @@ local function openPopup()
         end
     end
     refreshPopupItems()
+    Backdrop.Active = true
     Backdrop.Visible = true
     Popup.Visible = true
 end
 
 local function closePopup()
+    Backdrop.Active = false
     Backdrop.Visible = false
     Popup.Visible = false
     selectedInPopup = nil
