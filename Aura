@@ -1,119 +1,95 @@
--- Auto Training + Auto Rebirth GUI (v2 - compact layout)
+-- Auto Hub v3 - Compact GUI + Combo Target System
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RequestRebirth = RS:WaitForChild("Communication"):WaitForChild("RequestRebirth")
 
 local areas = {
-    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(118,  10,  -123)},
-    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(40,   17,  -136)},
-    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(249,  10,   -80)},
-    {name = "Electra Field", req = 100e24,  pos = Vector3.new(72,    9,   104)},
-    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(70,   30,  -288)},
-    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-225,  9,    -6)},
-    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(326,  13,   150)},
+    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
+    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(7,    15,  -132)},
+    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(289,  11,  -245)},
+    {name = "Egg Basket",    req = 99e21,   pos = Vector3.new(326,  10,   -82)},
+    {name = "Electra Field", req = 100e24,  pos = Vector3.new(69,   10,   166)},
+    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(79,   31,  -334)},
+    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-219, 10,   -50)},
+    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(321,  14,   112)},
 }
 
 local autoTraining = false
-local autoRebirth = false
-local autoCombo = false
-local currentArea = nil
+local autoRebirth  = false
+local autoCombo    = false
+local currentArea  = nil
 local rebirthCount = 0
-local threshold = 2
+local threshold    = 2
+
+local comboTarget      = nil
+local rebirthDone      = false
+local userPickedTarget = false
 
 local suffixes = {
-    {1e39, "Dd"},  -- tambah ni
-    {1e36, "Ud"},
-    {1e33, "Dc"},
-    {1e30, "No"},
-    {1e27, "Oc"},
-    {1e24, "Sp"},
-    {1e21, "Sx"},
-    {1e18, "Qi"},
-    {1e15, "Qa"},
-    {1e12, "T"},
-    {1e9,  "B"},
-    {1e6,  "M"},
-    {1e3,  "K"},
+    {1e39,"Dd"},{1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
+    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
+    {1e15,"Qa"},{1e12,"T"}, {1e9,"B"},  {1e6,"M"},{1e3,"K"},
 }
 
 local function formatNum(n)
-    for _, s in ipairs(suffixes) do
-        if n >= s[1] then
-            return string.format("%.1f%s", n / s[1], s[2])
-        end
+    for _,s in ipairs(suffixes) do
+        if n >= s[1] then return string.format("%.1f%s", n/s[1], s[2]) end
     end
     return tostring(math.floor(n))
 end
 
-local function getAura()
-    return player:GetAttribute("Aura") or 0
-end
+local function getAura() return player:GetAttribute("Aura") or 0 end
 
 local function teleport(pos)
-    local char = player.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+    local c = player.Character
+    if c and c:FindFirstChild("HumanoidRootPart") then
+        c.HumanoidRootPart.CFrame = CFrame.new(pos)
     end
 end
 
 local function getBestArea(aura)
     local best = nil
-    for _, area in ipairs(areas) do
-        if aura >= area.req then best = area end
-    end
+    for _,a in ipairs(areas) do if aura >= a.req then best = a end end
     return best
 end
 
 local function getNextArea(aura)
-    for _, area in ipairs(areas) do
-        if aura < area.req then return area end
-    end
+    for _,a in ipairs(areas) do if aura < a.req then return a end end
     return nil
 end
 
--- ─── GUI ────────────────────────────────────────────────────────────────────
+local function getAreaIndex(area)
+    if not area then return 0 end
+    for i,a in ipairs(areas) do if a.name == area.name then return i end end
+    return 0
+end
+
+-- ─── GUI Constants ────────────────────────────────────────────────────────────
+local ROW_H   = 16
+local SEC_H   = 12
+local STAT_H  = 12
+local GAP     = 4
+local PAD_TOP = 38
+local PAD_X   = 12
+local WHITE   = Color3.fromRGB(255, 255, 255)
+local DIM     = Color3.fromRGB(120, 110, 140)
+local PURPLE  = Color3.fromRGB(110, 70, 200)
+local WARN    = Color3.fromRGB(255, 180, 60)
+
+-- ─── ScreenGui ───────────────────────────────────────────────────────────────
+-- NOTE: NO DisplayOrder - caused mobile input issues
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = player.PlayerGui
 
--- Row heights & gaps (compact)
-local ROW_H   = 16   -- toggle row height (was 32)
-local SEC_H   = 12   -- section label height
-local STAT_H  = 12   -- status line height
-local GAP     = 4    -- spacing between rows
-local PAD_TOP = 38   -- below title bar
-local PAD_X   = 12   -- horizontal padding
-
--- Calculate total content height
--- Status area: Area + Rebirths = 2 × STAT_H + GAP
--- div → INDIVIDUAL → Train → Rebirth → div → COMBO → Train+Rebirth → Threshold → div → Next/Req/RebirthAt + Rebirths
-local CONTENT_H = (
-    GAP +                           -- top gap
-    STAT_H + GAP +                  -- Area
-    STAT_H + GAP +                  -- Rebirths  (moved to bottom, placeholder here)
-    1 + GAP +                       -- div2
-    SEC_H + GAP +                   -- INDIVIDUAL
-    ROW_H + GAP +                   -- Auto Training
-    ROW_H + GAP +                   -- Auto Rebirth
-    1 + GAP +                       -- div3
-    SEC_H + GAP +                   -- COMBO
-    ROW_H + GAP +                   -- Train + Rebirth
-    ROW_H + GAP +                   -- Threshold
-    1 + GAP +                       -- div4
-    STAT_H + GAP +                  -- Next
-    STAT_H + GAP +                  -- Req
-    STAT_H + GAP +                  -- Rebirth at
-    STAT_H + GAP                    -- Rebirths (bottom)
-)
-
-local FRAME_H = PAD_TOP + CONTENT_H + 6
-
+-- ─── Main Frame ──────────────────────────────────────────────────────────────
+-- NOTE: Active=true + Draggable=true same as v2 working script
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 210, 0, FRAME_H)
-Main.Position = UDim2.new(0, 16, 0.5, -FRAME_H/2)
+Main.Size = UDim2.new(0, 210, 0, 300)
+Main.Position = UDim2.new(0, 16, 0.5, -150)
 Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
@@ -121,12 +97,12 @@ Main.Active = true
 Main.Draggable = true
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(80, 60, 120)
+MainStroke.Thickness = 1
 
-local Stroke = Instance.new("UIStroke", Main)
-Stroke.Color = Color3.fromRGB(80, 60, 120)
-Stroke.Thickness = 1
-
--- Title Bar
+-- ─── Title Bar ───────────────────────────────────────────────────────────────
+-- NOTE: MinBtn/CloseBtn parent = TitleBar (same as v2, NOT Main directly)
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 36)
 TitleBar.BackgroundTransparency = 1
@@ -137,7 +113,7 @@ Title.Size = UDim2.new(1, -70, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "⚡ AUTO HUB"
-Title.TextColor3 = Color3.fromRGB(200, 180, 255)
+Title.TextColor3 = WHITE
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -149,7 +125,7 @@ MinBtn.Position = UDim2.new(1, -52, 0.5, -11)
 MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
 MinBtn.BorderSizePixel = 0
 MinBtn.Text = "—"
-MinBtn.TextColor3 = Color3.fromRGB(200, 195, 215)
+MinBtn.TextColor3 = WHITE
 MinBtn.TextSize = 10
 MinBtn.Font = Enum.Font.GothamBold
 MinBtn.Parent = TitleBar
@@ -161,20 +137,20 @@ CloseBtn.Position = UDim2.new(1, -26, 0.5, -11)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+CloseBtn.TextColor3 = WHITE
 CloseBtn.TextSize = 10
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
-local Div = Instance.new("Frame")
-Div.Size = UDim2.new(0.85, 0, 0, 1)
-Div.Position = UDim2.new(0.075, 0, 0, 36)
-Div.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
-Div.BorderSizePixel = 0
-Div.Parent = Main
+local TitleDiv = Instance.new("Frame")
+TitleDiv.Size = UDim2.new(0.85, 0, 0, 1)
+TitleDiv.Position = UDim2.new(0.075, 0, 0, 36)
+TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+TitleDiv.BorderSizePixel = 0
+TitleDiv.Parent = Main
 
--- ─── Content (scrollable/flow via manual Y cursor) ───────────────────────────
+-- ─── Content ─────────────────────────────────────────────────────────────────
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
 Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
@@ -182,14 +158,9 @@ Content.BackgroundTransparency = 1
 Content.ClipsDescendants = true
 Content.Parent = Main
 
--- Y cursor
 local y = GAP
 
-local function nextY(h)
-    local cur = y
-    y = y + h + GAP
-    return cur
-end
+local function nextY(h) local c=y; y=y+h+GAP; return c end
 
 local function makeDivider()
     local d = Instance.new("Frame")
@@ -200,36 +171,36 @@ local function makeDivider()
     d.Parent = Content
 end
 
-local function makeStatusLabel(text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, STAT_H)
-    lbl.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(140, 130, 160)
-    lbl.TextSize = 9
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = Content
-    return lbl
+local function makeStatusLabel(text, color)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -20, 0, STAT_H)
+    l.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or Color3.fromRGB(140, 130, 160)
+    l.TextSize = 9
+    l.Font = Enum.Font.Gotham
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = Content
+    return l
 end
 
 local function makeSection(text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, SEC_H)
-    lbl.Position = UDim2.new(0, PAD_X + 2, 0, nextY(SEC_H))
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(100, 90, 130)
-    lbl.TextSize = 8
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = Content
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -20, 0, SEC_H)
+    l.Position = UDim2.new(0, PAD_X+2, 0, nextY(SEC_H))
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = Color3.fromRGB(100, 90, 130)
+    l.TextSize = 8
+    l.Font = Enum.Font.GothamBold
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = Content
 end
 
+-- NOTE: Same pattern as v2 - Frame container + Hitbox TextButton on top
 local function makeToggleRow(labelText)
     local rowY = nextY(ROW_H)
-
     local Btn = Instance.new("Frame")
     Btn.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     Btn.Position = UDim2.new(0, PAD_X, 0, rowY)
@@ -237,7 +208,6 @@ local function makeToggleRow(labelText)
     Btn.BorderSizePixel = 0
     Btn.Parent = Content
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
-
     local BtnStroke = Instance.new("UIStroke", Btn)
     BtnStroke.Color = Color3.fromRGB(60, 45, 90)
     BtnStroke.Thickness = 1
@@ -253,7 +223,6 @@ local function makeToggleRow(labelText)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Btn
 
-    -- Pill (narrower to fit compact row)
     local Pill = Instance.new("Frame")
     Pill.Size = UDim2.new(0, 28, 0, 14)
     Pill.Position = UDim2.new(1, -36, 0.5, -7)
@@ -281,7 +250,6 @@ end
 
 local function makeThresholdRow()
     local rowY = nextY(ROW_H)
-
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
@@ -289,7 +257,6 @@ local function makeThresholdRow()
     TFrame.BorderSizePixel = 0
     TFrame.Parent = Content
     Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
-
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
     TStroke.Thickness = 1
@@ -342,126 +309,199 @@ local function makeThresholdRow()
     return MinusB, TVal, PlusB
 end
 
--- ─── Build layout (top → bottom) ────────────────────────────────────────────
+-- Target row (display only, no popup for now)
+local function makeTargetRow()
+    local rowY = nextY(ROW_H)
+    local TFrame = Instance.new("Frame")
+    TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
+    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BorderSizePixel = 0
+    TFrame.Parent = Content
+    Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
+    local TStroke = Instance.new("UIStroke", TFrame)
+    TStroke.Color = Color3.fromRGB(60, 45, 90)
+    TStroke.Thickness = 1
 
--- Status area (Area label only at top)
-local StatusLabel  = makeStatusLabel("Area: —")
+    local TLabel = Instance.new("TextLabel")
+    TLabel.Size = UDim2.new(0.45, 0, 1, 0)
+    TLabel.Position = UDim2.new(0, 8, 0, 0)
+    TLabel.BackgroundTransparency = 1
+    TLabel.Text = "Target"
+    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextSize = 10
+    TLabel.Font = Enum.Font.GothamBold
+    TLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TLabel.Parent = TFrame
 
+    local TVal = Instance.new("TextLabel")
+    TVal.Size = UDim2.new(0.52, -8, 1, 0)
+    TVal.Position = UDim2.new(0.45, 0, 0, 0)
+    TVal.BackgroundTransparency = 1
+    TVal.Text = "—"
+    TVal.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TVal.TextSize = 9
+    TVal.Font = Enum.Font.Gotham
+    TVal.TextXAlignment = Enum.TextXAlignment.Right
+    TVal.Parent = TFrame
+
+    return TVal
+end
+
+-- ─── Build Layout ─────────────────────────────────────────────────────────────
+local StatusLabel = makeStatusLabel("Area: —")
 makeDivider()
 
--- INDIVIDUAL section
 makeSection("INDIVIDUAL")
 local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeToggleRow("Auto Training")
 local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeToggleRow("Auto Rebirth")
-
 makeDivider()
 
--- COMBO section
 makeSection("COMBO")
 local ComboBtn, ComboPill, ComboDot, ComboStroke = makeToggleRow("Train + Rebirth")
-
--- Threshold immediately after Train+Rebirth
-local MinusBtn, ThreshValue, PlusBtn = makeThresholdRow()
-
+local TargetVal                                  = makeTargetRow()
+local MinusBtn, ThreshValue, PlusBtn             = makeThresholdRow()
 makeDivider()
 
--- Status info at bottom
-local NextAreaLabel  = makeStatusLabel("Next: —")
+local NextAreaLabel  = makeStatusLabel("Target: —")
 local ReqLabel       = makeStatusLabel("Req: —")
 local RebirthAtLabel = makeStatusLabel("Rebirth at: —")
+local WarnLabel      = makeStatusLabel("", WARN)
+local RebirthLabel   = makeStatusLabel("Rebirths: 0")
 
--- tweak colour for RebirthAt
-RebirthAtLabel.TextColor3 = Color3.fromRGB(180, 130, 255)
-
--- Rebirths count at very bottom
-local RebirthLabel = makeStatusLabel("Rebirths: 0")
-
--- Resize frame to actual content
+-- Resize
 Main.Size = UDim2.new(0, 210, 0, PAD_TOP + y + 4)
 Main.Position = UDim2.new(0, 16, 0.5, -(PAD_TOP + y + 4)/2)
 
--- ─── Toggle helper ───────────────────────────────────────────────────────────
+-- ─── Tween (after GUI build, same position as v2) ────────────────────────────
 local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
 
 local function setToggle(pill, dot, stroke, on)
     if on then
-        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
-        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 16, 0.5, -5), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(110, 70, 200)}):Play()
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = Color3.fromRGB(255,255,255)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
     else
-        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
-        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
     end
 end
 
--- ─── Combo status update ─────────────────────────────────────────────────────
-local function updateComboStatus()
-    local aura = getAura()
-    local next = getNextArea(aura)
-    if next then
-        NextAreaLabel.Text  = "Next: " .. next.name
-        ReqLabel.Text       = "Req: " .. formatNum(next.req)
-        RebirthAtLabel.Text = "Rebirth at: " .. formatNum(next.req * threshold)
+-- ─── Status Update ───────────────────────────────────────────────────────────
+local function updateStatus()
+    if comboTarget then
+        TargetVal.Text      = comboTarget.name
+        local rebirthAt     = comboTarget.req * threshold
+        NextAreaLabel.Text  = "Target: " .. comboTarget.name
+        ReqLabel.Text       = "Req: "    .. formatNum(comboTarget.req)
+        RebirthAtLabel.Text = "Rebirth at: " .. formatNum(rebirthAt)
+        WarnLabel.Text      = getAura() >= comboTarget.req and "⚠ Aura dah lepas target" or ""
     else
-        NextAreaLabel.Text  = "Next: Max area!"
+        TargetVal.Text      = "—"
+        NextAreaLabel.Text  = "Target: —"
         ReqLabel.Text       = "Req: —"
-        RebirthAtLabel.Text = "Rebirth at: 1000 aura"
+        RebirthAtLabel.Text = "Rebirth at: —"
+        WarnLabel.Text      = ""
     end
 end
 
--- ─── Threshold buttons ───────────────────────────────────────────────────────
+-- ─── Threshold ───────────────────────────────────────────────────────────────
 MinusBtn.MouseButton1Click:Connect(function()
-    if threshold > 1 then
-        threshold = threshold - 1
-        ThreshValue.Text = threshold .. "x"
-        updateComboStatus()
-    end
+    if threshold > 1 then threshold -= 1; ThreshValue.Text = threshold.."x"; updateStatus() end
 end)
-
 PlusBtn.MouseButton1Click:Connect(function()
-    if threshold < 20 then
-        threshold = threshold + 1
-        ThreshValue.Text = threshold .. "x"
-        updateComboStatus()
+    if threshold < 20 then threshold += 1; ThreshValue.Text = threshold.."x"; updateStatus() end
+end)
+
+-- ─── Minimize ────────────────────────────────────────────────────────────────
+local minimized = false
+local fullH = PAD_TOP + y + 4
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,210,0,38)}):Play()
+        Content.Visible = false
+        MinBtn.Text = "□"
+    else
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,210,0,fullH)}):Play()
+        Content.Visible = true
+        MinBtn.Text = "—"
     end
 end)
 
--- ─── Respawn handler ─────────────────────────────────────────────────────────
+-- ─── Close ───────────────────────────────────────────────────────────────────
+CloseBtn.MouseButton1Click:Connect(function()
+    autoTraining = false; autoRebirth = false; autoCombo = false
+    ScreenGui:Destroy()
+end)
+
+-- ─── Toggle Events ───────────────────────────────────────────────────────────
+TrainBtn.MouseButton1Click:Connect(function()
+    autoTraining = not autoTraining
+    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
+    if not autoTraining then StatusLabel.Text = "Area: —"; currentArea = nil end
+end)
+
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+end)
+
+ComboBtn.MouseButton1Click:Connect(function()
+    autoCombo = not autoCombo
+    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
+    if not autoCombo then StatusLabel.Text = "Area: —"; currentArea = nil end
+end)
+
+-- ─── Respawn ─────────────────────────────────────────────────────────────────
 player.CharacterAdded:Connect(function()
     task.wait(3)
     if autoTraining or autoCombo then
         local best = getBestArea(getAura())
         if best then
-            teleport(best.pos)
-            currentArea = best.name
+            teleport(best.pos); currentArea = best.name
             StatusLabel.Text = "Area: " .. best.name
         end
     end
 end)
 
--- ─── Auto Training loop ──────────────────────────────────────────────────────
+-- ─── Auto Training Loop ──────────────────────────────────────────────────────
 task.spawn(function()
     while true do
         if autoTraining or autoCombo then
             local aura = getAura()
             local best = getBestArea(aura)
             if best then
-                if best.name ~= currentArea then
-                    currentArea = best.name
-                    teleport(best.pos)
-                    StatusLabel.Text = "Area: " .. best.name
+                local targetIdx = comboTarget and getAreaIndex(comboTarget) or 999
+                local bestIdx   = getAreaIndex(best)
+                local blocked   = autoCombo and comboTarget and not rebirthDone and bestIdx >= targetIdx
+                if not blocked then
+                    if best.name ~= currentArea then
+                        currentArea = best.name; teleport(best.pos)
+                        StatusLabel.Text = "Area: " .. best.name
+                    end
+                else
+                    local farmArea = nil
+                    for i = targetIdx-1, 1, -1 do
+                        if aura >= areas[i].req then farmArea = areas[i]; break end
+                    end
+                    if farmArea and farmArea.name ~= currentArea then
+                        currentArea = farmArea.name; teleport(farmArea.pos)
+                        StatusLabel.Text = "Area: " .. farmArea.name .. " (farming)"
+                    end
                 end
             else
                 StatusLabel.Text = "Area: Belum cukup aura"
             end
-            updateComboStatus()
+            updateStatus()
         end
         task.wait(5)
     end
 end)
 
--- ─── Auto Rebirth loop ───────────────────────────────────────────────────────
+-- ─── Auto Rebirth Loop ───────────────────────────────────────────────────────
 task.spawn(function()
     while true do
         if autoRebirth then
@@ -475,84 +515,54 @@ task.spawn(function()
     end
 end)
 
--- ─── Combo loop ──────────────────────────────────────────────────────────────
+-- ─── Combo Loop ──────────────────────────────────────────────────────────────
 task.spawn(function()
     while true do
-        if autoCombo then
-            local aura = getAura()
-            local next = getNextArea(aura)
-            local shouldRebirth = false
-            if next then
-                if aura >= next.req * threshold then shouldRebirth = true end
-            else
-                if aura >= 1000 then shouldRebirth = true end
-            end
-            if shouldRebirth then
+        if autoCombo and comboTarget then
+            local aura      = getAura()
+            local rebirthAt = comboTarget.req * threshold
+            if aura >= rebirthAt then
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
+                rebirthDone = true
                 task.wait(2)
                 currentArea = nil
-                updateComboStatus()
+                if not userPickedTarget then
+                    local curIdx = getAreaIndex(comboTarget)
+                    if curIdx < #areas then
+                        comboTarget = areas[curIdx+1]
+                        rebirthDone = false
+                    end
+                else
+                    if getAura() >= comboTarget.req then
+                        local curIdx = getAreaIndex(comboTarget)
+                        if curIdx < #areas then
+                            comboTarget = areas[curIdx+1]
+                            rebirthDone = false
+                            userPickedTarget = false
+                        end
+                    else
+                        rebirthDone = false
+                        userPickedTarget = false
+                    end
+                end
+                updateStatus()
             end
         end
         task.wait(1)
     end
 end)
 
--- ─── Minimize ────────────────────────────────────────────────────────────────
-local minimized = false
-local fullH = PAD_TOP + y + 4
+-- ─── Init ────────────────────────────────────────────────────────────────────
+local function initDefaultTarget()
+    local next = getNextArea(getAura())
+    comboTarget = next or areas[#areas]
+    rebirthDone = false
+    userPickedTarget = false
+    updateStatus()
+end
 
-MinBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, 38)}):Play()
-        Content.Visible = false
-        MinBtn.Text = "□"
-    else
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, fullH)}):Play()
-        Content.Visible = true
-        MinBtn.Text = "—"
-    end
-end)
-
--- ─── Close ───────────────────────────────────────────────────────────────────
-CloseBtn.MouseButton1Click:Connect(function()
-    autoTraining = false
-    autoRebirth = false
-    autoCombo = false
-    ScreenGui:Destroy()
-end)
-
--- ─── Toggle events ───────────────────────────────────────────────────────────
-TrainBtn.MouseButton1Click:Connect(function()
-    autoTraining = not autoTraining
-    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
-    if not autoTraining then
-        StatusLabel.Text = "Area: —"
-        currentArea = nil
-    end
-end)
-
-RebirthBtn.MouseButton1Click:Connect(function()
-    autoRebirth = not autoRebirth
-    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
-end)
-
-ComboBtn.MouseButton1Click:Connect(function()
-    autoCombo = not autoCombo
-    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
-    if autoCombo then
-        updateComboStatus()
-    else
-        StatusLabel.Text = "Area: —"
-        currentArea = nil
-        NextAreaLabel.Text  = "Next: —"
-        ReqLabel.Text       = "Req: —"
-        RebirthAtLabel.Text = "Rebirth at: —"
-    end
-end)
-
-updateComboStatus()
-print("Auto Hub loaded!")
+initDefaultTarget()
+updateStatus()
+print("Auto Hub v3 loaded!")
