@@ -2,7 +2,13 @@
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local RequestRebirth = RS:WaitForChild("Communication"):WaitForChild("RequestRebirth")
+local RequestRebirth = RS
+    :WaitForChild("Packages")
+    :WaitForChild("Knit")
+    :WaitForChild("Services")
+    :WaitForChild("PlayerService")
+    :WaitForChild("RF")
+    :WaitForChild("RequestRebirth")
 
 local areas = {
     {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
