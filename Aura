@@ -1,0 +1,247 @@
+-- Auto Training + Auto Rebirth GUI
+local player = game.Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local RequestRebirth = RS:WaitForChild("Communication"):WaitForChild("RequestRebirth")
+
+local areas = {
+    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(118,  10,  -123)},
+    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(40,   17,  -136)},
+    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(249,  10,   -80)},
+    {name = "Electra Field", req = 100e24,  pos = Vector3.new(72,    9,   104)},
+    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(70,   30,  -288)},
+    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-225,  9,    -6)},
+    {name = "Fallen Star",   req = 10e36,   pos = Vector3.new(326,  13,   150)},
+}
+
+-- State
+local autoTraining = false
+local autoRebirth = false
+local currentArea = nil
+local rebirthCount = 0
+local trainingThread = nil
+local rebirthThread = nil
+
+-- Helper functions
+local function getAura()
+    return player:GetAttribute("Aura") or 0
+end
+
+local function teleport(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+
+local function getBestArea(aura)
+    local best = nil
+    for _, area in ipairs(areas) do
+        if aura >= area.req then best = area end
+    end
+    return best
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = player.PlayerGui
+
+-- Main Frame
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 200, 0, 220)
+Main.Position = UDim2.new(0, 16, 0.5, -110)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(80, 60, 120)
+Stroke.Thickness = 1
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 36)
+Title.Position = UDim2.new(0, 0, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ AUTO HUB"
+Title.TextColor3 = Color3.fromRGB(200, 180, 255)
+Title.TextSize = 13
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Main
+
+-- Divider
+local Div = Instance.new("Frame")
+Div.Size = UDim2.new(0.85, 0, 0, 1)
+Div.Position = UDim2.new(0.075, 0, 0, 36)
+Div.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+Div.BorderSizePixel = 0
+Div.Parent = Main
+
+-- Status label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 24)
+StatusLabel.Position = UDim2.new(0, 10, 0, 44)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Area: —"
+StatusLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
+StatusLabel.TextSize = 11
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = Main
+
+local RebirthLabel = Instance.new("TextLabel")
+RebirthLabel.Size = UDim2.new(1, -20, 0, 20)
+RebirthLabel.Position = UDim2.new(0, 10, 0, 64)
+RebirthLabel.BackgroundTransparency = 1
+RebirthLabel.Text = "Rebirths: 0"
+RebirthLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
+RebirthLabel.TextSize = 11
+RebirthLabel.Font = Enum.Font.Gotham
+RebirthLabel.TextXAlignment = Enum.TextXAlignment.Left
+RebirthLabel.Parent = Main
+
+-- Button builder
+local function makeButton(labelText, yPos)
+    local Btn = Instance.new("Frame")
+    Btn.Size = UDim2.new(1, -24, 0, 44)
+    Btn.Position = UDim2.new(0, 12, 0, yPos)
+    Btn.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    Btn.BorderSizePixel = 0
+    Btn.Parent = Main
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 10)
+
+    local BtnStroke = Instance.new("UIStroke", Btn)
+    BtnStroke.Color = Color3.fromRGB(60, 45, 90)
+    BtnStroke.Thickness = 1
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -54, 1, 0)
+    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = labelText
+    Label.TextColor3 = Color3.fromRGB(200, 195, 215)
+    Label.TextSize = 12
+    Label.Font = Enum.Font.GothamBold
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Btn
+
+    -- Toggle pill
+    local Pill = Instance.new("Frame")
+    Pill.Size = UDim2.new(0, 36, 0, 20)
+    Pill.Position = UDim2.new(1, -46, 0.5, -10)
+    Pill.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
+    Pill.BorderSizePixel = 0
+    Pill.Parent = Btn
+    Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
+
+    local Dot = Instance.new("Frame")
+    Dot.Size = UDim2.new(0, 14, 0, 14)
+    Dot.Position = UDim2.new(0, 3, 0.5, -7)
+    Dot.BackgroundColor3 = Color3.fromRGB(100, 90, 130)
+    Dot.BorderSizePixel = 0
+    Dot.Parent = Pill
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1, 0, 1, 0)
+    Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""
+    Hitbox.Parent = Btn
+
+    return Hitbox, Pill, Dot, BtnStroke
+end
+
+local TrainBtn, TrainPill, TrainDot, TrainStroke = makeButton("Auto Training", 96)
+local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeButton("Auto Rebirth", 152)
+
+-- Toggle animation
+local TweenService = game:GetService("TweenService")
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+
+local function setToggle(pill, dot, stroke, on)
+    if on then
+        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
+        TweenService:Create(dot, tweenInfo, {
+            Position = UDim2.new(0, 19, 0.5, -7),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(110, 70, 200)}):Play()
+    else
+        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
+        TweenService:Create(dot, tweenInfo, {
+            Position = UDim2.new(0, 3, 0.5, -7),
+            BackgroundColor3 = Color3.fromRGB(100, 90, 130)
+        }):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
+    end
+end
+
+-- Respawn handler
+player.CharacterAdded:Connect(function()
+    task.wait(3)
+    if autoTraining then
+        local best = getBestArea(getAura())
+        if best then
+            teleport(best.pos)
+            currentArea = best.name
+        end
+    end
+end)
+
+-- Auto Training loop
+local function startTraining()
+    trainingThread = task.spawn(function()
+        while autoTraining do
+            local aura = getAura()
+            local best = getBestArea(aura)
+            if best then
+                if best.name ~= currentArea then
+                    currentArea = best.name
+                    teleport(best.pos)
+                    StatusLabel.Text = "Area: " .. best.name
+                end
+            else
+                StatusLabel.Text = "Area: Belum cukup aura"
+            end
+            task.wait(5)
+        end
+    end)
+end
+
+-- Auto Rebirth loop
+local function startRebirth()
+    rebirthThread = task.spawn(function()
+        while autoRebirth do
+            RequestRebirth:InvokeServer()
+            rebirthCount += 1
+            RebirthLabel.Text = "Rebirths: " .. rebirthCount
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- Button events
+TrainBtn.MouseButton1Click:Connect(function()
+    autoTraining = not autoTraining
+    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
+    if autoTraining then
+        currentArea = nil
+        startTraining()
+    end
+end)
+
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+    if autoRebirth then
+        startRebirth()
+    end
+end)
+
+print("Auto Hub loaded!")
