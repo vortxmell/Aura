@@ -320,7 +320,7 @@ local function makeInputRow(labelText, defaultVal, step)
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
     Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
-    local InputBox = Instance.new("TextLabel")
+    local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 38, 0, 14)
     InputBox.Position = UDim2.new(1, -58, 0.5, -7)
     InputBox.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
@@ -329,7 +329,7 @@ local function makeInputRow(labelText, defaultVal, step)
     InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
-    -- ClearTextOnFocus removed (TextLabel)
+    InputBox.ClearTextOnFocus = true
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
     local PlusB = Instance.new("TextButton")
@@ -733,30 +733,35 @@ local function applyThreshold(val)
 end
 
 ThreshMinus.MouseButton1Click:Connect(function()
-    threshold = math.max(0.1, math.floor((threshold - 0.1) * 10 + 0.5) / 10)
+    threshold = math.max(0.5, threshold - 1)
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
 ThreshPlus.MouseButton1Click:Connect(function()
-    threshold = math.floor((threshold + 0.1) * 10 + 0.5) / 10
+    threshold = threshold + 1
     ThreshBox.Text = formatThresh(threshold)
     updateStatus()
 end)
--- ThreshBox is TextLabel, FocusLost removed
+ThreshBox.FocusLost:Connect(function()
+    local n = tonumber(ThreshBox.Text)
+    if n and n > 0 then threshold = math.max(0.5, n) end
+    ThreshBox.Text = formatThresh(threshold)
+    updateStatus()
+end)
 
 -- Multiplier logic
 local function applyMultiplier(val)
     local n = tonumber(val)
-    if n and n > 0 then multiplier = math.max(0.5, n) end
+    if n and n > 0 then multiplier = math.max(0.1, n) end
     MultBox.Text = formatThresh(multiplier)
 end
 
 MultMinus.MouseButton1Click:Connect(function()
-    multiplier = math.max(0.5, multiplier - 0.5)
+    multiplier = math.max(0.1, math.floor((multiplier - 0.1) * 10 + 0.5) / 10)
     MultBox.Text = formatThresh(multiplier)
 end)
 MultPlus.MouseButton1Click:Connect(function()
-    multiplier = multiplier + 0.5
+    multiplier = math.floor((multiplier + 0.1) * 10 + 0.5) / 10
     MultBox.Text = formatThresh(multiplier)
 end)
 MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
