@@ -672,7 +672,7 @@ end)
 -- Auto Rebirth loop
 task.spawn(function()
     while true do
-        if autoTraining or autoCombo then
+        if autoRebirth and not isRebirthing then
             RequestRebirth:InvokeServer()
             rebirthCount += 1
             RebirthLabel.Text = "Rebirths: " .. rebirthCount
