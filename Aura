@@ -22,7 +22,7 @@ local rebirthCount = 0
 local threshold = 2
 
 local suffixes = {
-    {1e39, "Dd"},  -- tambah ni
+    {1e39, "Dd"},
     {1e36, "Ud"},
     {1e33, "Dc"},
     {1e30, "No"},
@@ -79,37 +79,14 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = player.PlayerGui
 
--- Row heights & gaps (compact)
-local ROW_H   = 16   -- toggle row height (was 32)
-local SEC_H   = 12   -- section label height
-local STAT_H  = 12   -- status line height
-local GAP     = 4    -- spacing between rows
-local PAD_TOP = 38   -- below title bar
-local PAD_X   = 12   -- horizontal padding
+local ROW_H   = 16
+local SEC_H   = 12
+local STAT_H  = 12
+local GAP     = 4
+local PAD_TOP = 38
+local PAD_X   = 12
 
--- Calculate total content height
--- Status area: Area + Rebirths = 2 × STAT_H + GAP
--- div → INDIVIDUAL → Train → Rebirth → div → COMBO → Train+Rebirth → Threshold → div → Next/Req/RebirthAt + Rebirths
-local CONTENT_H = (
-    GAP +                           -- top gap
-    STAT_H + GAP +                  -- Area
-    STAT_H + GAP +                  -- Rebirths  (moved to bottom, placeholder here)
-    1 + GAP +                       -- div2
-    SEC_H + GAP +                   -- INDIVIDUAL
-    ROW_H + GAP +                   -- Auto Training
-    ROW_H + GAP +                   -- Auto Rebirth
-    1 + GAP +                       -- div3
-    SEC_H + GAP +                   -- COMBO
-    ROW_H + GAP +                   -- Train + Rebirth
-    ROW_H + GAP +                   -- Threshold
-    1 + GAP +                       -- div4
-    STAT_H + GAP +                  -- Next
-    STAT_H + GAP +                  -- Req
-    STAT_H + GAP +                  -- Rebirth at
-    STAT_H + GAP                    -- Rebirths (bottom)
-)
-
-local FRAME_H = PAD_TOP + CONTENT_H + 6
+local FRAME_H = PAD_TOP + 200
 
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 210, 0, FRAME_H)
@@ -137,7 +114,7 @@ Title.Size = UDim2.new(1, -70, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "⚡ AUTO HUB"
-Title.TextColor3 = Color3.fromRGB(200, 180, 255)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -149,7 +126,7 @@ MinBtn.Position = UDim2.new(1, -52, 0.5, -11)
 MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
 MinBtn.BorderSizePixel = 0
 MinBtn.Text = "—"
-MinBtn.TextColor3 = Color3.fromRGB(200, 195, 215)
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.TextSize = 10
 MinBtn.Font = Enum.Font.GothamBold
 MinBtn.Parent = TitleBar
@@ -161,7 +138,7 @@ CloseBtn.Position = UDim2.new(1, -26, 0.5, -11)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
 CloseBtn.BorderSizePixel = 0
 CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.TextSize = 10
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
@@ -174,7 +151,7 @@ Div.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 Div.BorderSizePixel = 0
 Div.Parent = Main
 
--- ─── Content (scrollable/flow via manual Y cursor) ───────────────────────────
+-- ─── Content ─────────────────────────────────────────────────────────────────
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
 Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
@@ -182,7 +159,6 @@ Content.BackgroundTransparency = 1
 Content.ClipsDescendants = true
 Content.Parent = Main
 
--- Y cursor
 local y = GAP
 
 local function nextY(h)
@@ -206,7 +182,7 @@ local function makeStatusLabel(text)
     lbl.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(140, 130, 160)
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.TextSize = 9
     lbl.Font = Enum.Font.Gotham
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -220,7 +196,7 @@ local function makeSection(text)
     lbl.Position = UDim2.new(0, PAD_X + 2, 0, nextY(SEC_H))
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(100, 90, 130)
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.TextSize = 8
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -247,13 +223,12 @@ local function makeToggleRow(labelText)
     Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = labelText
-    Label.TextColor3 = Color3.fromRGB(200, 195, 215)
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
     Label.TextSize = 10
     Label.Font = Enum.Font.GothamBold
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Btn
 
-    -- Pill (narrower to fit compact row)
     local Pill = Instance.new("Frame")
     Pill.Size = UDim2.new(0, 28, 0, 14)
     Pill.Position = UDim2.new(1, -36, 0.5, -7)
@@ -299,7 +274,7 @@ local function makeThresholdRow()
     TLabel.Position = UDim2.new(0, 8, 0, 0)
     TLabel.BackgroundTransparency = 1
     TLabel.Text = "Threshold"
-    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TLabel.TextSize = 10
     TLabel.Font = Enum.Font.GothamBold
     TLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -311,7 +286,7 @@ local function makeThresholdRow()
     MinusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     MinusB.BorderSizePixel = 0
     MinusB.Text = "−"
-    MinusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    MinusB.TextColor3 = Color3.fromRGB(255, 255, 255)
     MinusB.TextSize = 11
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
@@ -322,7 +297,7 @@ local function makeThresholdRow()
     TVal.Position = UDim2.new(1, -38, 0, 0)
     TVal.BackgroundTransparency = 1
     TVal.Text = "2x"
-    TVal.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TVal.TextColor3 = Color3.fromRGB(255, 255, 255)
     TVal.TextSize = 10
     TVal.Font = Enum.Font.GothamBold
     TVal.Parent = TFrame
@@ -333,7 +308,7 @@ local function makeThresholdRow()
     PlusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     PlusB.BorderSizePixel = 0
     PlusB.Text = "+"
-    PlusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    PlusB.TextColor3 = Color3.fromRGB(255, 255, 255)
     PlusB.TextSize = 11
     PlusB.Font = Enum.Font.GothamBold
     PlusB.Parent = TFrame
@@ -342,41 +317,29 @@ local function makeThresholdRow()
     return MinusB, TVal, PlusB
 end
 
--- ─── Build layout (top → bottom) ────────────────────────────────────────────
-
--- Status area (Area label only at top)
-local StatusLabel  = makeStatusLabel("Area: —")
+-- ─── Build layout ────────────────────────────────────────────────────────────
+local StatusLabel = makeStatusLabel("Area: —")
 
 makeDivider()
 
--- INDIVIDUAL section
 makeSection("INDIVIDUAL")
 local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeToggleRow("Auto Training")
 local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeToggleRow("Auto Rebirth")
 
 makeDivider()
 
--- COMBO section
 makeSection("COMBO")
 local ComboBtn, ComboPill, ComboDot, ComboStroke = makeToggleRow("Train + Rebirth")
-
--- Threshold immediately after Train+Rebirth
 local MinusBtn, ThreshValue, PlusBtn = makeThresholdRow()
 
 makeDivider()
 
--- Status info at bottom
 local NextAreaLabel  = makeStatusLabel("Next: —")
 local ReqLabel       = makeStatusLabel("Req: —")
 local RebirthAtLabel = makeStatusLabel("Rebirth at: —")
+local RebirthLabel   = makeStatusLabel("Rebirths: 0")
 
--- tweak colour for RebirthAt
-RebirthAtLabel.TextColor3 = Color3.fromRGB(180, 130, 255)
-
--- Rebirths count at very bottom
-local RebirthLabel = makeStatusLabel("Rebirths: 0")
-
--- Resize frame to actual content
+-- Resize frame ikut content sebenar
 Main.Size = UDim2.new(0, 210, 0, PAD_TOP + y + 4)
 Main.Position = UDim2.new(0, 16, 0.5, -(PAD_TOP + y + 4)/2)
 
@@ -385,12 +348,12 @@ local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
 
 local function setToggle(pill, dot, stroke, on)
     if on then
-        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
-        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 16, 0.5, -5), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0, 16, 0.5, -5), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(110, 70, 200)}):Play()
     else
-        TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
-        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
     end
 end
