@@ -709,6 +709,7 @@ SetBtn.MouseButton1Click:Connect(function()
     comboTarget = areas[selectedInPopup]
     updateStatus()
     closePopup()
+    autoSave()
 end)
 
 -- Toggle helper
@@ -754,15 +755,18 @@ end
 MultMinus.MouseButton1Click:Connect(function()
     multiplier = math.max(0.1, math.floor((multiplier - 0.1) * 10 + 0.5) / 10)
     MultBox.Text = formatThresh(multiplier)
+    autoSave()
 end)
 MultPlus.MouseButton1Click:Connect(function()
     multiplier = math.floor((multiplier + 0.1) * 10 + 0.5) / 10
     MultBox.Text = formatThresh(multiplier)
+    autoSave()
 end)
 MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
 MultHitbox.MouseButton1Click:Connect(function()
     multiplierOn = not multiplierOn
     setToggle(MultPill, MultDot, MultStroke, multiplierOn)
+    autoSave()
 end)
 
 -- Minimize
@@ -789,22 +793,26 @@ TrainBtn.MouseButton1Click:Connect(function()
     autoTraining = not autoTraining
     setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
     if not autoTraining then currentArea = nil end
+    autoSave()
 end)
 
 RebirthBtn.MouseButton1Click:Connect(function()
     autoRebirth = not autoRebirth
     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+    autoSave()
 end)
 
 ComboBtn.MouseButton1Click:Connect(function()
     autoCombo = not autoCombo
     setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
     if not autoCombo then currentArea = nil end
+    autoSave()
 end)
 
 ZoneBtn.MouseButton1Click:Connect(function()
     zoneGuard = not zoneGuard
     setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard)
+    autoSave()
 end)
 
 -- Respawn
@@ -902,6 +910,105 @@ task.spawn(function()
     end
 end)
 
+
+-- ─── CONFIG SYSTEM ───────────────────────────────────────────────────────────
+local CONFIG_FILE = "autohub_config.json"
+local hasFS = false
+pcall(function()
+    hasFS = type(isfolder) == "function"
+        and type(writefile) == "function"
+        and type(readfile) == "function"
+end)
+
+local function getCurrentSettings()
+    return {
+        autoTraining  = autoTraining,
+        autoRebirth   = autoRebirth,
+        autoCombo     = autoCombo,
+        zoneGuard     = zoneGuard,
+        multiplierOn  = multiplierOn,
+        threshold     = threshold,
+        multiplier    = multiplier,
+        comboTargetName = comboTarget and comboTarget.name or nil,
+    }
+end
+
+local function saveConfig()
+    if not hasFS then return end
+    local ok, err = pcall(function()
+        local data = game:GetService("HttpService"):JSONEncode(getCurrentSettings())
+        writefile(CONFIG_FILE, data)
+    end)
+end
+
+local function applyConfig(s)
+    if not s then return end
+
+    -- Restore values
+    if s.threshold   then threshold  = s.threshold  end
+    if s.multiplier  then multiplier = s.multiplier end
+
+    -- Restore comboTarget
+    if s.comboTargetName then
+        for _, a in ipairs(areas) do
+            if a.name == s.comboTargetName then
+                comboTarget = a
+                break
+            end
+        end
+    end
+
+    -- Restore multiplier toggle
+    if s.multiplierOn ~= nil then
+        multiplierOn = s.multiplierOn
+        setToggle(MultPill, MultDot, MultStroke, multiplierOn)
+    end
+
+    -- Restore toggles (variables only, loops already running)
+    if s.autoTraining ~= nil then
+        autoTraining = s.autoTraining
+        setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
+    end
+    if s.autoRebirth ~= nil then
+        autoRebirth = s.autoRebirth
+        setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+    end
+    if s.autoCombo ~= nil then
+        autoCombo = s.autoCombo
+        setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
+    end
+    if s.zoneGuard ~= nil then
+        zoneGuard = s.zoneGuard
+        setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard)
+    end
+
+    -- Update UI display
+    ThreshBox.Text = formatThresh(threshold)
+    MultBox.Text   = formatThresh(multiplier)
+    updateStatus()
+end
+
+local function loadConfig()
+    if not hasFS then return end
+    local ok, data = pcall(readfile, CONFIG_FILE)
+    if not ok or not data or data == "" then return end
+    local ok2, s = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(data)
+    end)
+    if ok2 and s then
+        applyConfig(s)
+        print("Auto Hub: Config loaded!")
+    end
+end
+
+-- Auto-save bila mana-mana toggle atau value berubah
+local function autoSave()
+    task.spawn(function()
+        task.wait(0.5) -- debounce
+        saveConfig()
+    end)
+end
+
 -- Init
 local function initDefaultTarget()
     local next = getNextArea(getAura())
@@ -910,4 +1017,5 @@ local function initDefaultTarget()
 end
 
 initDefaultTarget()
+loadConfig()  -- Auto load saved config on execute
 print("Auto Hub v3 loaded!")
