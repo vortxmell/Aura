@@ -1,4 +1,4 @@
--- Auto Training + Auto Rebirth GUI
+-- Auto Training + Auto Rebirth GUI (v2 - compact layout)
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -62,16 +62,48 @@ local function getNextArea(aura)
     return nil
 end
 
--- GUI
+-- ─── GUI ────────────────────────────────────────────────────────────────────
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = player.PlayerGui
 
+-- Row heights & gaps (compact)
+local ROW_H   = 16   -- toggle row height (was 32)
+local SEC_H   = 12   -- section label height
+local STAT_H  = 12   -- status line height
+local GAP     = 4    -- spacing between rows
+local PAD_TOP = 38   -- below title bar
+local PAD_X   = 12   -- horizontal padding
+
+-- Calculate total content height
+-- Status area: Area + Rebirths = 2 × STAT_H + GAP
+-- div → INDIVIDUAL → Train → Rebirth → div → COMBO → Train+Rebirth → Threshold → div → Next/Req/RebirthAt + Rebirths
+local CONTENT_H = (
+    GAP +                           -- top gap
+    STAT_H + GAP +                  -- Area
+    STAT_H + GAP +                  -- Rebirths  (moved to bottom, placeholder here)
+    1 + GAP +                       -- div2
+    SEC_H + GAP +                   -- INDIVIDUAL
+    ROW_H + GAP +                   -- Auto Training
+    ROW_H + GAP +                   -- Auto Rebirth
+    1 + GAP +                       -- div3
+    SEC_H + GAP +                   -- COMBO
+    ROW_H + GAP +                   -- Train + Rebirth
+    ROW_H + GAP +                   -- Threshold
+    1 + GAP +                       -- div4
+    STAT_H + GAP +                  -- Next
+    STAT_H + GAP +                  -- Req
+    STAT_H + GAP +                  -- Rebirth at
+    STAT_H + GAP                    -- Rebirths (bottom)
+)
+
+local FRAME_H = PAD_TOP + CONTENT_H + 6
+
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 210, 0, 310)
-Main.Position = UDim2.new(0, 16, 0.5, -155)
+Main.Size = UDim2.new(0, 210, 0, FRAME_H)
+Main.Position = UDim2.new(0, 16, 0.5, -FRAME_H/2)
 Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
@@ -132,94 +164,97 @@ Div.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 Div.BorderSizePixel = 0
 Div.Parent = Main
 
--- Content
+-- ─── Content (scrollable/flow via manual Y cursor) ───────────────────────────
 local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, 0, 1, -38)
-Content.Position = UDim2.new(0, 0, 0, 38)
+Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
+Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
 Content.BackgroundTransparency = 1
+Content.ClipsDescendants = true
 Content.Parent = Main
 
--- Status row
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 18)
-StatusLabel.Position = UDim2.new(0, 10, 0, 4)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Area: —"
-StatusLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
-StatusLabel.TextSize = 10
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = Content
+-- Y cursor
+local y = GAP
 
-local RebirthLabel = Instance.new("TextLabel")
-RebirthLabel.Size = UDim2.new(1, -20, 0, 18)
-RebirthLabel.Position = UDim2.new(0, 10, 0, 20)
-RebirthLabel.BackgroundTransparency = 1
-RebirthLabel.Text = "Rebirths: 0"
-RebirthLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
-RebirthLabel.TextSize = 10
-RebirthLabel.Font = Enum.Font.Gotham
-RebirthLabel.TextXAlignment = Enum.TextXAlignment.Left
-RebirthLabel.Parent = Content
+local function nextY(h)
+    local cur = y
+    y = y + h + GAP
+    return cur
+end
 
-local Div2 = Instance.new("Frame")
-Div2.Size = UDim2.new(0.85, 0, 0, 1)
-Div2.Position = UDim2.new(0.075, 0, 0, 42)
-Div2.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-Div2.BorderSizePixel = 0
-Div2.Parent = Content
+local function makeDivider()
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(0.85, 0, 0, 1)
+    d.Position = UDim2.new(0.075, 0, 0, nextY(1))
+    d.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    d.BorderSizePixel = 0
+    d.Parent = Content
+end
 
--- Helpers
-local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
-
-local function makeSection(text, yPos)
+local function makeStatusLabel(text)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, 16)
-    lbl.Position = UDim2.new(0, 14, 0, yPos)
+    lbl.Size = UDim2.new(1, -20, 0, STAT_H)
+    lbl.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(140, 130, 160)
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = Content
+    return lbl
+end
+
+local function makeSection(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, SEC_H)
+    lbl.Position = UDim2.new(0, PAD_X + 2, 0, nextY(SEC_H))
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = Color3.fromRGB(100, 90, 130)
-    lbl.TextSize = 9
+    lbl.TextSize = 8
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = Content
 end
 
-local function makeButton(labelText, yPos)
+local function makeToggleRow(labelText)
+    local rowY = nextY(ROW_H)
+
     local Btn = Instance.new("Frame")
-    Btn.Size = UDim2.new(1, -24, 0, 32)
-    Btn.Position = UDim2.new(0, 12, 0, yPos)
+    Btn.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    Btn.Position = UDim2.new(0, PAD_X, 0, rowY)
     Btn.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
     Btn.BorderSizePixel = 0
     Btn.Parent = Content
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
     local BtnStroke = Instance.new("UIStroke", Btn)
     BtnStroke.Color = Color3.fromRGB(60, 45, 90)
     BtnStroke.Thickness = 1
 
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -54, 1, 0)
-    Label.Position = UDim2.new(0, 10, 0, 0)
+    Label.Size = UDim2.new(1, -50, 1, 0)
+    Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = labelText
     Label.TextColor3 = Color3.fromRGB(200, 195, 215)
-    Label.TextSize = 11
+    Label.TextSize = 10
     Label.Font = Enum.Font.GothamBold
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Btn
 
+    -- Pill (narrower to fit compact row)
     local Pill = Instance.new("Frame")
-    Pill.Size = UDim2.new(0, 32, 0, 17)
-    Pill.Position = UDim2.new(1, -42, 0.5, -8)
+    Pill.Size = UDim2.new(0, 28, 0, 14)
+    Pill.Position = UDim2.new(1, -36, 0.5, -7)
     Pill.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
     Pill.BorderSizePixel = 0
     Pill.Parent = Btn
     Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
 
     local Dot = Instance.new("Frame")
-    Dot.Size = UDim2.new(0, 12, 0, 12)
-    Dot.Position = UDim2.new(0, 3, 0.5, -6)
+    Dot.Size = UDim2.new(0, 10, 0, 10)
+    Dot.Position = UDim2.new(0, 2, 0.5, -5)
     Dot.BackgroundColor3 = Color3.fromRGB(100, 90, 130)
     Dot.BorderSizePixel = 0
     Dot.Parent = Pill
@@ -234,149 +269,138 @@ local function makeButton(labelText, yPos)
     return Hitbox, Pill, Dot, BtnStroke
 end
 
+local function makeThresholdRow()
+    local rowY = nextY(ROW_H)
+
+    local TFrame = Instance.new("Frame")
+    TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
+    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BorderSizePixel = 0
+    TFrame.Parent = Content
+    Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
+
+    local TStroke = Instance.new("UIStroke", TFrame)
+    TStroke.Color = Color3.fromRGB(60, 45, 90)
+    TStroke.Thickness = 1
+
+    local TLabel = Instance.new("TextLabel")
+    TLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    TLabel.Position = UDim2.new(0, 8, 0, 0)
+    TLabel.BackgroundTransparency = 1
+    TLabel.Text = "Threshold"
+    TLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
+    TLabel.TextSize = 10
+    TLabel.Font = Enum.Font.GothamBold
+    TLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TLabel.Parent = TFrame
+
+    local MinusB = Instance.new("TextButton")
+    MinusB.Size = UDim2.new(0, 16, 0, 16)
+    MinusB.Position = UDim2.new(1, -56, 0.5, -8)
+    MinusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    MinusB.BorderSizePixel = 0
+    MinusB.Text = "−"
+    MinusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    MinusB.TextSize = 11
+    MinusB.Font = Enum.Font.GothamBold
+    MinusB.Parent = TFrame
+    Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
+
+    local TVal = Instance.new("TextLabel")
+    TVal.Size = UDim2.new(0, 22, 1, 0)
+    TVal.Position = UDim2.new(1, -38, 0, 0)
+    TVal.BackgroundTransparency = 1
+    TVal.Text = "2x"
+    TVal.TextColor3 = Color3.fromRGB(180, 150, 255)
+    TVal.TextSize = 10
+    TVal.Font = Enum.Font.GothamBold
+    TVal.Parent = TFrame
+
+    local PlusB = Instance.new("TextButton")
+    PlusB.Size = UDim2.new(0, 16, 0, 16)
+    PlusB.Position = UDim2.new(1, -18, 0.5, -8)
+    PlusB.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    PlusB.BorderSizePixel = 0
+    PlusB.Text = "+"
+    PlusB.TextColor3 = Color3.fromRGB(200, 180, 255)
+    PlusB.TextSize = 11
+    PlusB.Font = Enum.Font.GothamBold
+    PlusB.Parent = TFrame
+    Instance.new("UICorner", PlusB).CornerRadius = UDim.new(1, 0)
+
+    return MinusB, TVal, PlusB
+end
+
+-- ─── Build layout (top → bottom) ────────────────────────────────────────────
+
+-- Status area (Area label only at top)
+local StatusLabel  = makeStatusLabel("Area: —")
+
+makeDivider()
+
+-- INDIVIDUAL section
+makeSection("INDIVIDUAL")
+local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeToggleRow("Auto Training")
+local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeToggleRow("Auto Rebirth")
+
+makeDivider()
+
+-- COMBO section
+makeSection("COMBO")
+local ComboBtn, ComboPill, ComboDot, ComboStroke = makeToggleRow("Train + Rebirth")
+
+-- Threshold immediately after Train+Rebirth
+local MinusBtn, ThreshValue, PlusBtn = makeThresholdRow()
+
+makeDivider()
+
+-- Status info at bottom
+local NextAreaLabel  = makeStatusLabel("Next: —")
+local ReqLabel       = makeStatusLabel("Req: —")
+local RebirthAtLabel = makeStatusLabel("Rebirth at: —")
+
+-- tweak colour for RebirthAt
+RebirthAtLabel.TextColor3 = Color3.fromRGB(180, 130, 255)
+
+-- Rebirths count at very bottom
+local RebirthLabel = makeStatusLabel("Rebirths: 0")
+
+-- Resize frame to actual content
+Main.Size = UDim2.new(0, 210, 0, PAD_TOP + y + 4)
+Main.Position = UDim2.new(0, 16, 0.5, -(PAD_TOP + y + 4)/2)
+
+-- ─── Toggle helper ───────────────────────────────────────────────────────────
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+
 local function setToggle(pill, dot, stroke, on)
     if on then
         TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
-        TweenService:Create(dot, tweenInfo, {Position = UDim2.new(0, 17, 0.5, -6), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 16, 0.5, -5), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(110, 70, 200)}):Play()
     else
         TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
-        TweenService:Create(dot, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -6), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
+        TweenService:Create(dot,  tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
     end
 end
 
--- Individual
-makeSection("INDIVIDUAL", 48)
-local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeButton("Auto Training",  64)
-local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeButton("Auto Rebirth",  100)
-
-local Div3 = Instance.new("Frame")
-Div3.Size = UDim2.new(0.85, 0, 0, 1)
-Div3.Position = UDim2.new(0.075, 0, 0, 138)
-Div3.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-Div3.BorderSizePixel = 0
-Div3.Parent = Content
-
--- Combo
-makeSection("COMBO", 144)
-local ComboBtn, ComboPill, ComboDot, ComboStroke = makeButton("Train + Rebirth", 160)
-
--- Combo status info
-local NextAreaLabel = Instance.new("TextLabel")
-NextAreaLabel.Size = UDim2.new(1, -24, 0, 16)
-NextAreaLabel.Position = UDim2.new(0, 12, 0, 196)
-NextAreaLabel.BackgroundTransparency = 1
-NextAreaLabel.Text = "Next: —"
-NextAreaLabel.TextColor3 = Color3.fromRGB(130, 120, 160)
-NextAreaLabel.TextSize = 10
-NextAreaLabel.Font = Enum.Font.Gotham
-NextAreaLabel.TextXAlignment = Enum.TextXAlignment.Left
-NextAreaLabel.Parent = Content
-
-local ReqLabel = Instance.new("TextLabel")
-ReqLabel.Size = UDim2.new(1, -24, 0, 16)
-ReqLabel.Position = UDim2.new(0, 12, 0, 212)
-ReqLabel.BackgroundTransparency = 1
-ReqLabel.Text = "Req: —"
-ReqLabel.TextColor3 = Color3.fromRGB(130, 120, 160)
-ReqLabel.TextSize = 10
-ReqLabel.Font = Enum.Font.Gotham
-ReqLabel.TextXAlignment = Enum.TextXAlignment.Left
-ReqLabel.Parent = Content
-
-local RebirthAtLabel = Instance.new("TextLabel")
-RebirthAtLabel.Size = UDim2.new(1, -24, 0, 16)
-RebirthAtLabel.Position = UDim2.new(0, 12, 0, 228)
-RebirthAtLabel.BackgroundTransparency = 1
-RebirthAtLabel.Text = "Rebirth at: —"
-RebirthAtLabel.TextColor3 = Color3.fromRGB(180, 130, 255)
-RebirthAtLabel.TextSize = 10
-RebirthAtLabel.Font = Enum.Font.Gotham
-RebirthAtLabel.TextXAlignment = Enum.TextXAlignment.Left
-RebirthAtLabel.Parent = Content
-
-local Div4 = Instance.new("Frame")
-Div4.Size = UDim2.new(0.85, 0, 0, 1)
-Div4.Position = UDim2.new(0.075, 0, 0, 250)
-Div4.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-Div4.BorderSizePixel = 0
-Div4.Parent = Content
-
--- Threshold adjuster
-local ThresholdFrame = Instance.new("Frame")
-ThresholdFrame.Size = UDim2.new(1, -24, 0, 32)
-ThresholdFrame.Position = UDim2.new(0, 12, 0, 256)
-ThresholdFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
-ThresholdFrame.BorderSizePixel = 0
-ThresholdFrame.Parent = Content
-Instance.new("UICorner", ThresholdFrame).CornerRadius = UDim.new(0, 8)
-
-local ThreshStroke = Instance.new("UIStroke", ThresholdFrame)
-ThreshStroke.Color = Color3.fromRGB(60, 45, 90)
-ThreshStroke.Thickness = 1
-
-local ThreshLabel = Instance.new("TextLabel")
-ThreshLabel.Size = UDim2.new(0.5, 0, 1, 0)
-ThreshLabel.Position = UDim2.new(0, 10, 0, 0)
-ThreshLabel.BackgroundTransparency = 1
-ThreshLabel.Text = "Threshold"
-ThreshLabel.TextColor3 = Color3.fromRGB(200, 195, 215)
-ThreshLabel.TextSize = 11
-ThreshLabel.Font = Enum.Font.GothamBold
-ThreshLabel.TextXAlignment = Enum.TextXAlignment.Left
-ThreshLabel.Parent = ThresholdFrame
-
-local MinusBtn = Instance.new("TextButton")
-MinusBtn.Size = UDim2.new(0, 22, 0, 22)
-MinusBtn.Position = UDim2.new(1, -72, 0.5, -11)
-MinusBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-MinusBtn.BorderSizePixel = 0
-MinusBtn.Text = "−"
-MinusBtn.TextColor3 = Color3.fromRGB(200, 180, 255)
-MinusBtn.TextSize = 13
-MinusBtn.Font = Enum.Font.GothamBold
-MinusBtn.Parent = ThresholdFrame
-Instance.new("UICorner", MinusBtn).CornerRadius = UDim.new(1, 0)
-
-local ThreshValue = Instance.new("TextLabel")
-ThreshValue.Size = UDim2.new(0, 26, 1, 0)
-ThreshValue.Position = UDim2.new(1, -48, 0, 0)
-ThreshValue.BackgroundTransparency = 1
-ThreshValue.Text = "2x"
-ThreshValue.TextColor3 = Color3.fromRGB(180, 150, 255)
-ThreshValue.TextSize = 12
-ThreshValue.Font = Enum.Font.GothamBold
-ThreshValue.Parent = ThresholdFrame
-
-local PlusBtn = Instance.new("TextButton")
-PlusBtn.Size = UDim2.new(0, 22, 0, 22)
-PlusBtn.Position = UDim2.new(1, -26, 0.5, -11)
-PlusBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-PlusBtn.BorderSizePixel = 0
-PlusBtn.Text = "+"
-PlusBtn.TextColor3 = Color3.fromRGB(200, 180, 255)
-PlusBtn.TextSize = 13
-PlusBtn.Font = Enum.Font.GothamBold
-PlusBtn.Parent = ThresholdFrame
-Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(1, 0)
-
--- Update combo status labels
+-- ─── Combo status update ─────────────────────────────────────────────────────
 local function updateComboStatus()
     local aura = getAura()
     local next = getNextArea(aura)
     if next then
-        NextAreaLabel.Text = "Next: " .. next.name
-        ReqLabel.Text = "Req: " .. formatNum(next.req)
+        NextAreaLabel.Text  = "Next: " .. next.name
+        ReqLabel.Text       = "Req: " .. formatNum(next.req)
         RebirthAtLabel.Text = "Rebirth at: " .. formatNum(next.req * threshold)
     else
-        NextAreaLabel.Text = "Next: Max area!"
-        ReqLabel.Text = "Req: —"
+        NextAreaLabel.Text  = "Next: Max area!"
+        ReqLabel.Text       = "Req: —"
         RebirthAtLabel.Text = "Rebirth at: 1000 aura"
     end
 end
 
--- Threshold buttons
+-- ─── Threshold buttons ───────────────────────────────────────────────────────
 MinusBtn.MouseButton1Click:Connect(function()
     if threshold > 1 then
         threshold = threshold - 1
@@ -393,7 +417,7 @@ PlusBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Respawn handler
+-- ─── Respawn handler ─────────────────────────────────────────────────────────
 player.CharacterAdded:Connect(function()
     task.wait(3)
     if autoTraining or autoCombo then
@@ -406,7 +430,7 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
--- Auto Training loop
+-- ─── Auto Training loop ──────────────────────────────────────────────────────
 task.spawn(function()
     while true do
         if autoTraining or autoCombo then
@@ -427,7 +451,7 @@ task.spawn(function()
     end
 end)
 
--- Auto Rebirth loop
+-- ─── Auto Rebirth loop ───────────────────────────────────────────────────────
 task.spawn(function()
     while true do
         if autoRebirth then
@@ -441,24 +465,18 @@ task.spawn(function()
     end
 end)
 
--- Combo loop
+-- ─── Combo loop ──────────────────────────────────────────────────────────────
 task.spawn(function()
     while true do
         if autoCombo then
             local aura = getAura()
             local next = getNextArea(aura)
             local shouldRebirth = false
-
             if next then
-                if aura >= next.req * threshold then
-                    shouldRebirth = true
-                end
+                if aura >= next.req * threshold then shouldRebirth = true end
             else
-                if aura >= 1000 then
-                    shouldRebirth = true
-                end
+                if aura >= 1000 then shouldRebirth = true end
             end
-
             if shouldRebirth then
                 RequestRebirth:InvokeServer()
                 rebirthCount += 1
@@ -472,8 +490,10 @@ task.spawn(function()
     end
 end)
 
--- Minimize
+-- ─── Minimize ────────────────────────────────────────────────────────────────
 local minimized = false
+local fullH = PAD_TOP + y + 4
+
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
@@ -481,13 +501,13 @@ MinBtn.MouseButton1Click:Connect(function()
         Content.Visible = false
         MinBtn.Text = "□"
     else
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, 310)}):Play()
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, fullH)}):Play()
         Content.Visible = true
         MinBtn.Text = "—"
     end
 end)
 
--- Close
+-- ─── Close ───────────────────────────────────────────────────────────────────
 CloseBtn.MouseButton1Click:Connect(function()
     autoTraining = false
     autoRebirth = false
@@ -495,7 +515,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Button events
+-- ─── Toggle events ───────────────────────────────────────────────────────────
 TrainBtn.MouseButton1Click:Connect(function()
     autoTraining = not autoTraining
     setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
@@ -518,8 +538,8 @@ ComboBtn.MouseButton1Click:Connect(function()
     else
         StatusLabel.Text = "Area: —"
         currentArea = nil
-        NextAreaLabel.Text = "Next: —"
-        ReqLabel.Text = "Req: —"
+        NextAreaLabel.Text  = "Next: —"
+        ReqLabel.Text       = "Req: —"
         RebirthAtLabel.Text = "Rebirth at: —"
     end
 end)
