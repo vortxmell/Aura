@@ -1,6 +1,7 @@
 -- Auto Training + Auto Rebirth GUI
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local RequestRebirth = RS:WaitForChild("Communication"):WaitForChild("RequestRebirth")
 
 local areas = {
@@ -13,15 +14,12 @@ local areas = {
     {name = "Fallen Star",   req = 10e36,   pos = Vector3.new(326,  13,   150)},
 }
 
--- State
 local autoTraining = false
 local autoRebirth = false
+local autoCombo = false
 local currentArea = nil
 local rebirthCount = 0
-local trainingThread = nil
-local rebirthThread = nil
 
--- Helper functions
 local function getAura()
     return player:GetAttribute("Aura") or 0
 end
@@ -41,6 +39,13 @@ local function getBestArea(aura)
     return best
 end
 
+local function getNextArea(aura)
+    for _, area in ipairs(areas) do
+        if aura < area.req then return area end
+    end
+    return nil
+end
+
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
@@ -48,72 +53,116 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = player.PlayerGui
 
--- Main Frame
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 200, 0, 220)
-Main.Position = UDim2.new(0, 16, 0.5, -110)
+Main.Size = UDim2.new(0, 210, 0, 290)
+Main.Position = UDim2.new(0, 16, 0.5, -145)
 Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
 Main.Active = true
 Main.Draggable = true
 Main.Parent = ScreenGui
-
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 
 local Stroke = Instance.new("UIStroke", Main)
 Stroke.Color = Color3.fromRGB(80, 60, 120)
 Stroke.Thickness = 1
 
--- Title
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 38)
+TitleBar.BackgroundTransparency = 1
+TitleBar.Parent = Main
+
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 36)
-Title.Position = UDim2.new(0, 0, 0, 0)
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "⚡ AUTO HUB"
 Title.TextColor3 = Color3.fromRGB(200, 180, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
-Title.Parent = Main
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
 
--- Divider
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 24, 0, 24)
+MinBtn.Position = UDim2.new(1, -56, 0.5, -12)
+MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
+MinBtn.BorderSizePixel = 0
+MinBtn.Text = "—"
+MinBtn.TextColor3 = Color3.fromRGB(200, 195, 215)
+MinBtn.TextSize = 11
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+CloseBtn.Position = UDim2.new(1, -28, 0.5, -12)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+CloseBtn.TextSize = 11
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
+
 local Div = Instance.new("Frame")
 Div.Size = UDim2.new(0.85, 0, 0, 1)
-Div.Position = UDim2.new(0.075, 0, 0, 36)
+Div.Position = UDim2.new(0.075, 0, 0, 38)
 Div.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 Div.BorderSizePixel = 0
 Div.Parent = Main
 
--- Status label
+-- Content
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -40)
+Content.Position = UDim2.new(0, 0, 0, 40)
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 24)
-StatusLabel.Position = UDim2.new(0, 10, 0, 44)
+StatusLabel.Size = UDim2.new(1, -20, 0, 20)
+StatusLabel.Position = UDim2.new(0, 10, 0, 4)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Area: —"
 StatusLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
 StatusLabel.TextSize = 11
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = Main
+StatusLabel.Parent = Content
 
 local RebirthLabel = Instance.new("TextLabel")
 RebirthLabel.Size = UDim2.new(1, -20, 0, 20)
-RebirthLabel.Position = UDim2.new(0, 10, 0, 64)
+RebirthLabel.Position = UDim2.new(0, 10, 0, 22)
 RebirthLabel.BackgroundTransparency = 1
 RebirthLabel.Text = "Rebirths: 0"
 RebirthLabel.TextColor3 = Color3.fromRGB(140, 130, 160)
 RebirthLabel.TextSize = 11
 RebirthLabel.Font = Enum.Font.Gotham
 RebirthLabel.TextXAlignment = Enum.TextXAlignment.Left
-RebirthLabel.Parent = Main
+RebirthLabel.Parent = Content
+
+-- Divider between status and buttons
+local Div2 = Instance.new("Frame")
+Div2.Size = UDim2.new(0.85, 0, 0, 1)
+Div2.Position = UDim2.new(0.075, 0, 0, 48)
+Div2.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+Div2.BorderSizePixel = 0
+Div2.Parent = Content
 
 -- Button builder
-local function makeButton(labelText, yPos)
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+
+local function makeButton(parent, labelText, yPos)
     local Btn = Instance.new("Frame")
     Btn.Size = UDim2.new(1, -24, 0, 44)
     Btn.Position = UDim2.new(0, 12, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
     Btn.BorderSizePixel = 0
-    Btn.Parent = Main
+    Btn.Parent = parent
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 10)
 
     local BtnStroke = Instance.new("UIStroke", Btn)
@@ -126,12 +175,11 @@ local function makeButton(labelText, yPos)
     Label.BackgroundTransparency = 1
     Label.Text = labelText
     Label.TextColor3 = Color3.fromRGB(200, 195, 215)
-    Label.TextSize = 12
+    Label.TextSize = 11
     Label.Font = Enum.Font.GothamBold
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Btn
 
-    -- Toggle pill
     local Pill = Instance.new("Frame")
     Pill.Size = UDim2.new(0, 36, 0, 20)
     Pill.Position = UDim2.new(1, -46, 0.5, -10)
@@ -157,27 +205,44 @@ local function makeButton(labelText, yPos)
     return Hitbox, Pill, Dot, BtnStroke
 end
 
-local TrainBtn, TrainPill, TrainDot, TrainStroke = makeButton("Auto Training", 96)
-local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeButton("Auto Rebirth", 152)
+-- Section label helper
+local function makeSection(parent, text, yPos)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -20, 0, 18)
+    lbl.Position = UDim2.new(0, 14, 0, yPos)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(100, 90, 130)
+    lbl.TextSize = 10
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = parent
+end
+
+makeSection(Content, "INDIVIDUAL", 54)
+local TrainBtn,   TrainPill,   TrainDot,   TrainStroke   = makeButton(Content, "Auto Training",  72)
+local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke = makeButton(Content, "Auto Rebirth",  120)
+
+-- Divider
+local Div3 = Instance.new("Frame")
+Div3.Size = UDim2.new(0.85, 0, 0, 1)
+Div3.Position = UDim2.new(0.075, 0, 0, 170)
+Div3.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+Div3.BorderSizePixel = 0
+Div3.Parent = Content
+
+makeSection(Content, "COMBO", 176)
+local ComboBtn,   ComboPill,   ComboDot,   ComboStroke   = makeButton(Content, "Train + Rebirth", 194)
 
 -- Toggle animation
-local TweenService = game:GetService("TweenService")
-local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
-
 local function setToggle(pill, dot, stroke, on)
     if on then
         TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(110, 70, 200)}):Play()
-        TweenService:Create(dot, tweenInfo, {
-            Position = UDim2.new(0, 19, 0.5, -7),
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        }):Play()
+        TweenService:Create(dot, tweenInfo, {Position = UDim2.new(0, 19, 0.5, -7), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(110, 70, 200)}):Play()
     else
         TweenService:Create(pill, tweenInfo, {BackgroundColor3 = Color3.fromRGB(40, 35, 55)}):Play()
-        TweenService:Create(dot, tweenInfo, {
-            Position = UDim2.new(0, 3, 0.5, -7),
-            BackgroundColor3 = Color3.fromRGB(100, 90, 130)
-        }):Play()
+        TweenService:Create(dot, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(100, 90, 130)}):Play()
         TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60, 45, 90)}):Play()
     end
 end
@@ -185,19 +250,20 @@ end
 -- Respawn handler
 player.CharacterAdded:Connect(function()
     task.wait(3)
-    if autoTraining then
+    if autoTraining or autoCombo then
         local best = getBestArea(getAura())
         if best then
             teleport(best.pos)
             currentArea = best.name
+            StatusLabel.Text = "Area: " .. best.name
         end
     end
 end)
 
 -- Auto Training loop
-local function startTraining()
-    trainingThread = task.spawn(function()
-        while autoTraining do
+task.spawn(function()
+    while true do
+        if autoTraining or autoCombo then
             local aura = getAura()
             local best = getBestArea(aura)
             if best then
@@ -209,38 +275,100 @@ local function startTraining()
             else
                 StatusLabel.Text = "Area: Belum cukup aura"
             end
-            task.wait(5)
         end
-    end)
-end
+        task.wait(5)
+    end
+end)
 
 -- Auto Rebirth loop
-local function startRebirth()
-    rebirthThread = task.spawn(function()
-        while autoRebirth do
+task.spawn(function()
+    while true do
+        if autoRebirth then
             RequestRebirth:InvokeServer()
             rebirthCount += 1
             RebirthLabel.Text = "Rebirths: " .. rebirthCount
             task.wait(0.1)
+        else
+            task.wait(0.1)
         end
-    end)
-end
+    end
+end)
+
+-- Combo loop — rebirth bila 3x next area req, then teleport balik
+task.spawn(function()
+    while true do
+        if autoCombo then
+            local aura = getAura()
+            local next = getNextArea(aura)
+            local shouldRebirth = false
+
+            if next then
+                if aura >= next.req * 3 then
+                    shouldRebirth = true
+                end
+            else
+                -- Dah max area
+                if aura >= 1000 then
+                    shouldRebirth = true
+                end
+            end
+
+            if shouldRebirth then
+                RequestRebirth:InvokeServer()
+                rebirthCount += 1
+                RebirthLabel.Text = "Rebirths: " .. rebirthCount
+                task.wait(2)
+                currentArea = nil -- force reteleport
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Minimize
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, 40)}):Play()
+        Content.Visible = false
+        MinBtn.Text = "□"
+    else
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0, 210, 0, 290)}):Play()
+        Content.Visible = true
+        MinBtn.Text = "—"
+    end
+end)
+
+-- Close
+CloseBtn.MouseButton1Click:Connect(function()
+    autoTraining = false
+    autoRebirth = false
+    autoCombo = false
+    ScreenGui:Destroy()
+end)
 
 -- Button events
 TrainBtn.MouseButton1Click:Connect(function()
     autoTraining = not autoTraining
     setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
-    if autoTraining then
+    if not autoTraining then
+        StatusLabel.Text = "Area: —"
         currentArea = nil
-        startTraining()
     end
 end)
 
 RebirthBtn.MouseButton1Click:Connect(function()
     autoRebirth = not autoRebirth
     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
-    if autoRebirth then
-        startRebirth()
+end)
+
+ComboBtn.MouseButton1Click:Connect(function()
+    autoCombo = not autoCombo
+    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
+    if not autoCombo then
+        StatusLabel.Text = "Area: —"
+        currentArea = nil
     end
 end)
 
