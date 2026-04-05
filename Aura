@@ -45,9 +45,13 @@ local isRebirthing   = false
 local threshold      = 2
 local multiplier     = 2
 local comboTarget    = nil
-local autoKOTH       = false
-local forceHop       = false
-local kothHopping    = false
+local autoKOTH           = false
+local forceHop           = false
+local kothHopping        = false
+local autoKothRebirth    = false
+local kothRebirthTarget  = 500e39  -- default 500Dd
+local kothRebirthUnit    = "Dd"
+local kothRebirthVal     = 500
 
 local suffixes = {
     {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
@@ -690,6 +694,195 @@ kHopBtn.MouseButton1Click:Connect(function()
     forceHop = true
 end)
 
+-- --- KOTH AUTO REBIRTH Section ---
+makeKDiv()
+makeKSection("AUTO REBIRTH (KOTH)")
+
+-- Toggle row
+local kRebRow = Instance.new("Frame")
+kRebRow.Size = UDim2.new(1,-10,0,ROW_H); kRebRow.Position = UDim2.new(0,5,0,yK)
+kRebRow.BackgroundColor3 = PANEL; kRebRow.BorderSizePixel = 0; kRebRow.Parent = PanelKOTH
+Instance.new("UICorner", kRebRow).CornerRadius = UDim.new(0,6)
+local kRebStroke = Instance.new("UIStroke", kRebRow)
+kRebStroke.Color = Color3.fromRGB(60,45,90); kRebStroke.Thickness = 1
+local kRebLabel = Instance.new("TextLabel")
+kRebLabel.Size = UDim2.new(1,-50,1,0); kRebLabel.Position = UDim2.new(0,8,0,0)
+kRebLabel.BackgroundTransparency = 1; kRebLabel.Text = "Auto Rebirth"
+kRebLabel.TextColor3 = WHITE; kRebLabel.TextSize = 10; kRebLabel.Font = Enum.Font.GothamBold
+kRebLabel.TextXAlignment = Enum.TextXAlignment.Left; kRebLabel.Parent = kRebRow
+local kRebPill = Instance.new("Frame")
+kRebPill.Size = UDim2.new(0,28,0,14); kRebPill.Position = UDim2.new(1,-36,0.5,-7)
+kRebPill.BackgroundColor3 = Color3.fromRGB(40,35,55); kRebPill.BorderSizePixel = 0; kRebPill.Parent = kRebRow
+Instance.new("UICorner", kRebPill).CornerRadius = UDim.new(1,0)
+local kRebDot = Instance.new("Frame")
+kRebDot.Size = UDim2.new(0,10,0,10); kRebDot.Position = UDim2.new(0,2,0.5,-5)
+kRebDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebDot.BorderSizePixel = 0; kRebDot.Parent = kRebPill
+Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
+local kRebHitbox = Instance.new("TextButton")
+kRebHitbox.Size = UDim2.new(1,0,1,0); kRebHitbox.BackgroundTransparency = 1
+kRebHitbox.Text = ""; kRebHitbox.Parent = kRebRow
+yK = yK + ROW_H + GAP
+
+-- Input row: value + unit dropdown
+local kRebInputRow = Instance.new("Frame")
+kRebInputRow.Size = UDim2.new(1,-10,0,22); kRebInputRow.Position = UDim2.new(0,5,0,yK)
+kRebInputRow.BackgroundColor3 = PANEL; kRebInputRow.BorderSizePixel = 0; kRebInputRow.Parent = PanelKOTH
+Instance.new("UICorner", kRebInputRow).CornerRadius = UDim.new(0,6)
+Instance.new("UIStroke", kRebInputRow).Color = Color3.fromRGB(60,45,90)
+
+local kRebValLabel = Instance.new("TextLabel")
+kRebValLabel.Size = UDim2.new(0,38,1,0); kRebValLabel.Position = UDim2.new(0,6,0,0)
+kRebValLabel.BackgroundTransparency = 1; kRebValLabel.Text = "Target:"
+kRebValLabel.TextColor3 = DIM; kRebValLabel.TextSize = 9; kRebValLabel.Font = Enum.Font.GothamBold
+kRebValLabel.TextXAlignment = Enum.TextXAlignment.Left; kRebValLabel.Parent = kRebInputRow
+
+local kRebInput = Instance.new("TextBox")
+kRebInput.Size = UDim2.new(0,48,0,14); kRebInput.Position = UDim2.new(0,46,0.5,-7)
+kRebInput.BackgroundColor3 = Color3.fromRGB(30,26,44); kRebInput.BorderSizePixel = 0
+kRebInput.Text = "500"; kRebInput.TextColor3 = WHITE
+kRebInput.TextSize = 10; kRebInput.Font = Enum.Font.GothamBold
+kRebInput.ClearTextOnFocus = true; kRebInput.Parent = kRebInputRow
+Instance.new("UICorner", kRebInput).CornerRadius = UDim.new(0,4)
+
+-- Unit dropdown button
+local kRebUnitBtn = Instance.new("TextButton")
+kRebUnitBtn.Size = UDim2.new(0,40,0,14); kRebUnitBtn.Position = UDim2.new(0,98,0.5,-7)
+kRebUnitBtn.BackgroundColor3 = PURPLE; kRebUnitBtn.BorderSizePixel = 0
+kRebUnitBtn.Text = "Dd ▾"; kRebUnitBtn.TextColor3 = WHITE
+kRebUnitBtn.TextSize = 9; kRebUnitBtn.Font = Enum.Font.GothamBold
+kRebUnitBtn.Parent = kRebInputRow
+Instance.new("UICorner", kRebUnitBtn).CornerRadius = UDim.new(0,4)
+
+local kRebStatus = Instance.new("TextLabel")
+kRebStatus.Size = UDim2.new(0,60,1,0); kRebStatus.Position = UDim2.new(1,-62,0,0)
+kRebStatus.BackgroundTransparency = 1; kRebStatus.Text = "OFF"
+kRebStatus.TextColor3 = RED; kRebStatus.TextSize = 9; kRebStatus.Font = Enum.Font.GothamBold
+kRebStatus.TextXAlignment = Enum.TextXAlignment.Right; kRebStatus.Parent = kRebInputRow
+yK = yK + 22 + GAP
+
+-- Rebirth counter label
+local kRebCount = Instance.new("TextLabel")
+kRebCount.Size = UDim2.new(1,-10,0,STAT_H); kRebCount.Position = UDim2.new(0,5,0,yK)
+kRebCount.BackgroundTransparency = 1; kRebCount.Text = "KOTH Rebirths: 0"
+kRebCount.TextColor3 = DIM; kRebCount.TextSize = 9; kRebCount.Font = Enum.Font.Gotham
+kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = PanelKOTH
+yK = yK + STAT_H + GAP
+
+-- Unit dropdown popup (parented to ScreenGui so it float above everything)
+local kRebUnitUnits = {"Qd","Td","Dd","Ud","Dc","No","Oc","Sp","Sx","Qi","Qa"}
+local kRebUnitValues = {1e45,1e42,1e39,1e36,1e33,1e30,1e27,1e24,1e21,1e18,1e15}
+
+local kRebDropdown = Instance.new("Frame")
+kRebDropdown.Size = UDim2.new(0,60,0, (#kRebUnitUnits * 20) + 4)
+kRebDropdown.BackgroundColor3 = Color3.fromRGB(20,16,32); kRebDropdown.BorderSizePixel = 0
+kRebDropdown.ZIndex = 20; kRebDropdown.Visible = false; kRebDropdown.Parent = ScreenGui
+Instance.new("UICorner", kRebDropdown).CornerRadius = UDim.new(0,6)
+local kRebDropStroke = Instance.new("UIStroke", kRebDropdown)
+kRebDropStroke.Color = PURPLE; kRebDropStroke.Thickness = 1
+
+local kRebUnitBtns = {}
+for idx, unit in ipairs(kRebUnitUnits) do
+    local item = Instance.new("TextButton")
+    item.Size = UDim2.new(1,0,0,20); item.Position = UDim2.new(0,0,0,(idx-1)*20+2)
+    item.BackgroundTransparency = 1; item.BorderSizePixel = 0
+    item.Text = unit; item.TextColor3 = WHITE
+    item.TextSize = 10; item.Font = Enum.Font.GothamBold
+    item.ZIndex = 21; item.Parent = kRebDropdown
+    kRebUnitBtns[idx] = item
+end
+
+local kRebDropOpen = false
+local function closeKRebDrop()
+    kRebDropdown.Visible = false; kRebDropOpen = false
+end
+local function openKRebDrop()
+    -- Position dropdown below the unit button
+    local absPos = kRebUnitBtn.AbsolutePosition
+    local absSize = kRebUnitBtn.AbsoluteSize
+    kRebDropdown.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
+    kRebDropdown.Visible = true; kRebDropOpen = true
+end
+
+local function updateKRebTarget()
+    local n = tonumber(kRebInput.Text)
+    if n and n > 0 then
+        kothRebirthVal = n
+    end
+    -- find unit multiplier
+    for i, u in ipairs(kRebUnitUnits) do
+        if u == kothRebirthUnit then
+            kothRebirthTarget = kothRebirthVal * kRebUnitValues[i]
+            break
+        end
+    end
+end
+
+kRebUnitBtn.MouseButton1Click:Connect(function()
+    if kRebDropOpen then closeKRebDrop() else openKRebDrop() end
+end)
+
+for idx, item in ipairs(kRebUnitBtns) do
+    item.MouseButton1Click:Connect(function()
+        kothRebirthUnit = kRebUnitUnits[idx]
+        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
+        -- highlight selected
+        for _, b in ipairs(kRebUnitBtns) do
+            b.TextColor3 = WHITE
+        end
+        item.TextColor3 = Color3.fromRGB(180,120,255)
+        updateKRebTarget()
+        closeKRebDrop()
+    end)
+end
+
+kRebInput.FocusLost:Connect(function()
+    local n = tonumber(kRebInput.Text)
+    if not n or n <= 0 then kRebInput.Text = tostring(kothRebirthVal) return end
+    kothRebirthVal = n
+    kRebInput.Text = tostring(kothRebirthVal)
+    updateKRebTarget()
+end)
+
+-- Close dropdown kalau click luar
+ScreenGui.DescendantAdded:Connect(function() end) -- dummy
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if kRebDropOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local pos = input.Position
+        local dPos = kRebDropdown.AbsolutePosition
+        local dSize = kRebDropdown.AbsoluteSize
+        if pos.X < dPos.X or pos.X > dPos.X+dSize.X or pos.Y < dPos.Y or pos.Y > dPos.Y+dSize.Y then
+            closeKRebDrop()
+        end
+    end
+end)
+
+local kothRebirthCount = 0
+kRebHitbox.MouseButton1Click:Connect(function()
+    autoKothRebirth = not autoKothRebirth
+    setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
+    kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
+    kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
+    updateKRebTarget()
+end)
+
+-- Loop auto rebirth KOTH
+task.spawn(function()
+    while true do
+        if autoKothRebirth then
+            local aura = getAura()
+            if aura >= kothRebirthTarget then
+                if RequestRebirth then
+                    pcall(function() RequestRebirth:InvokeServer() end)
+                end
+                kothRebirthCount = kothRebirthCount + 1
+                kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
+                task.wait(1)
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
 
 -- --- KOTH Logic (Hitbox Polling) ---
@@ -987,15 +1180,18 @@ end
 
 local function getCurrentSettings()
     return {
-        autoTraining    = autoTraining,
-        autoRebirth     = autoRebirth,
-        autoCombo       = autoCombo,
-        zoneGuard       = zoneGuard,
-        multiplierOn    = multiplierOn,
-        threshold       = threshold,
-        multiplier      = multiplier,
-        comboTargetName = comboTarget and comboTarget.name or nil,
-        autoKOTH        = autoKOTH,
+        autoTraining       = autoTraining,
+        autoRebirth        = autoRebirth,
+        autoCombo          = autoCombo,
+        zoneGuard          = zoneGuard,
+        multiplierOn       = multiplierOn,
+        threshold          = threshold,
+        multiplier         = multiplier,
+        comboTargetName    = comboTarget and comboTarget.name or nil,
+        autoKOTH           = autoKOTH,
+        autoKothRebirth    = autoKothRebirth,
+        kothRebirthVal     = kothRebirthVal,
+        kothRebirthUnit    = kothRebirthUnit,
     }
 end
 
@@ -1019,6 +1215,18 @@ local function applySettings(s)
         kAutoStatus.Text = autoKOTH and "🔄 Running..." or "💤 Idle"
         kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
     end
+    if s.autoKothRebirth ~= nil then
+        autoKothRebirth = s.autoKothRebirth
+        setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
+        kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
+        kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
+    end
+    if s.kothRebirthVal  ~= nil then kothRebirthVal  = s.kothRebirthVal;  kRebInput.Text = tostring(kothRebirthVal) end
+    if s.kothRebirthUnit ~= nil then
+        kothRebirthUnit = s.kothRebirthUnit
+        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
+    end
+    updateKRebTarget()
     ThreshBox.Text = formatThresh(threshold); MultBox.Text = formatThresh(multiplier)
     updateStatus()
 end
