@@ -1004,8 +1004,8 @@ end
 
 local function applySettings(s)
     if not s then return end
-    if s.threshold  then threshold  = s.threshold  end
-    if s.multiplier then multiplier = s.multiplier end
+    if s.threshold  ~= nil then threshold  = s.threshold  end
+    if s.multiplier ~= nil then multiplier = s.multiplier end
     if s.comboTargetName then
         for _,a in ipairs(areas) do
             if a.name == s.comboTargetName then comboTarget = a; break end
