@@ -33,9 +33,8 @@ local threshold      = 2
 local multiplier     = 2
 local comboTarget    = nil
 local autoKOTH       = false
-local autoKOTH       = false
-local forceHop       = false   -- NEW: Force server hop toggle
-local kothHopping    = false   -- Lock supaya tak double-hop
+local forceHop       = false
+local kothHopping    = false
 
 local suffixes = {
     {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
@@ -683,7 +682,7 @@ makeKDiv()
 makeKSection("MY STATS")
 local kRowMyRank = makeKRow("My Rank:")
 
--- ─── NEW: Auto KOTH Section ───────────────────────────────────────────────────
+-- ─── AUTO KOTH Section ───────────────────────────────────────────────────────
 makeKDiv()
 makeKSection("AUTO KOTH")
 
@@ -739,7 +738,6 @@ end)
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
 
 -- ─── KOTH Logic (Hitbox Polling) ─────────────────────────────────────────────
--- Guna workspace.KOTH.AreaHitbox — confirmed berjaya detect player dalam KOTH
 local kothHitbox = nil
 pcall(function()
     kothHitbox = workspace:WaitForChild("KOTH", 10):WaitForChild("AreaHitbox", 10)
@@ -849,7 +847,6 @@ local function switchTab(tab)
     local indicatorY = tab=="farm" and 13 or tab=="koth" and 55 or tab=="config" and 97 or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0,indicatorY)}):Play()
 
-    -- Update KOTH panel terus bila switch ke tab tu
     if tab == "koth" then updateKOTHPanel() end
 end
 
@@ -1239,7 +1236,7 @@ ZoneBtn.MouseButton1Click:Connect(function()
     setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard); autoSave()
 end)
 
--- ─── NEW: Auto KOTH Toggle Event ──────────────────────────────────────────────
+-- ─── Auto KOTH Toggle Event ───────────────────────────────────────────────────
 kAutoHitbox.MouseButton1Click:Connect(function()
     autoKOTH = not autoKOTH
     setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
@@ -1334,8 +1331,8 @@ task.spawn(function()
 end)
 
 -- ─── Server Hop Function ──────────────────────────────────────────────────────
-local TeleportService = game:GetService("TeleportService")  -- remove line 1458 duplicate lepas ni
-local placeId = game.PlaceId                                -- same, remove duplicate
+local TeleportService = game:GetService("TeleportService")
+local placeId = game.PlaceId
 
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
@@ -1395,28 +1392,63 @@ local function hopToLeastPopulated(reason)
     end)
 end
 
--- ─── NEW: Auto KOTH Loop ──────────────────────────────────────────────────────
+-- ─── Auto KOTH Loop (Full Logic + Server Hop) ─────────────────────────────────
 task.spawn(function()
     local KOTH_POS = Vector3.new(-118, 32, 123)
+    local wasHolding = false
+
     while ScreenGui.Parent do
-        if autoKOTH then
-            if isInKOTH() then
-                kAutoStatus.Text = "👑 Holding KOTH!"
-                kAutoStatus.TextColor3 = WHITE
+        -- Force Hop (independent dari autoKOTH)
+        if forceHop then
+            forceHop = false
+            hopToLeastPopulated("Force")
+            task.wait(5)
+        end
+
+        if autoKOTH and not kothHopping then
+            local myAura = getAura()
+            local claimed, kingName, kingAura = getKOTHStatus()
+            local inKOTH = isInKOTH()
+
+            if inKOTH then
+                if claimed and kingAura > myAura then
+                    -- Ada player masuk aura lebih tinggi, hop sebelum mati
+                    wasHolding = false
+                    kAutoStatus.Text = "⚠️ Threat! Hopping..."
+                    kAutoStatus.TextColor3 = RED
+                    hopToLeastPopulated("Threat")
+                else
+                    wasHolding = true
+                    kAutoStatus.Text = "👑 Holding KOTH!"
+                    kAutoStatus.TextColor3 = WHITE
+                end
             else
-                local myAura = getAura()
-                local claimed, kingName, kingAura = getKOTHStatus()
-                if not claimed then
-                    kAutoStatus.Text = "Empty — entering!"
+                if wasHolding then
+                    -- Pernah holding tapi dah keluar = kena kill
+                    if claimed and kingAura > myAura then
+                        wasHolding = false
+                        kAutoStatus.Text = "💀 Killed! Hopping..."
+                        kAutoStatus.TextColor3 = RED
+                        hopToLeastPopulated("Killed")
+                        task.wait(5)
+                    else
+                        wasHolding = false
+                        kAutoStatus.Text = "🔁 Re-entering..."
+                        kAutoStatus.TextColor3 = WARN
+                        teleport(KOTH_POS)
+                    end
+                elseif not claimed then
+                    kAutoStatus.Text = "🟢 Empty — entering!"
                     kAutoStatus.TextColor3 = GREEN
                     teleport(KOTH_POS)
                 elseif myAura > kingAura then
-                    kAutoStatus.Text = "King weak — entering!"
+                    kAutoStatus.Text = "⚡ King weak — entering!"
                     kAutoStatus.TextColor3 = WARN
                     teleport(KOTH_POS)
                 else
-                    kAutoStatus.Text = "King strong — waiting"
+                    kAutoStatus.Text = "💪 King strong — hopping!"
                     kAutoStatus.TextColor3 = RED
+                    hopToLeastPopulated("Strong King")
                 end
             end
         end
@@ -1538,11 +1570,6 @@ task.spawn(function()
 end)
 
 -- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
-local TeleportService = game:GetService("TeleportService")
-local placeId = game.PlaceId
-
-game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
-
 game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.RequestedFromServer then
         warn("[AutoHub] Server teleport detected")
@@ -1559,4 +1586,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Auto Hub v3 loaded! KOTH = hitbox polling + Auto Enter")
+print("Auto Hub v3 loaded! KOTH = Full Auto + Server Hop")
