@@ -768,7 +768,7 @@ local function updateKOTHPanel()
     if isInKOTH() then
         kStatusDot.BackgroundColor3 = PURPLE
         kRowStatus.Text = "👑 Holding KOTH!"
-        kRowStatus.TextColor3 = PURPLE
+        kRowStatus.TextColor3 = WHITE
         kRowKing.Text = "— (You)"
         kRowKing.TextColor3 = WHITE
         kRowKingAura.Text = fmtA(myAura)
@@ -1319,7 +1319,7 @@ task.spawn(function()
         if autoKOTH then
             if isInKOTH() then
                 kAutoStatus.Text = "👑 Holding KOTH!"
-                kAutoStatus.TextColor3 = PURPLE
+                kAutoStatus.TextColor3 = WHITE
             else
                 local myAura = getAura()
                 local claimed, kingName, kingAura = getKOTHStatus()
