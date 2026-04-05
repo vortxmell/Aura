@@ -813,13 +813,25 @@ yA = yA + 36
 PanelAnalyzer.CanvasSize = UDim2.new(0, 0, 0, yA + 4)
 
 -- ─── Build KOTH Panel ────────────────────────────────────────────────────────
-local KOTH_RE = RS
-    :WaitForChild("Packages")
-    :WaitForChild("Knit")
-    :WaitForChild("Services")
-    :WaitForChild("TrainingAreasService")
-    :WaitForChild("RE")
-    :WaitForChild("KOTHStateChanged")
+-- KOTH Remote Event - lazy load untuk avoid timing issues
+local KOTH_RE = nil
+local function getKOTH_RE()
+    if KOTH_RE then return KOTH_RE end
+    local ok, result = pcall(function()
+        return RS
+            :WaitForChild("Packages", 5)
+            :WaitForChild("Knit", 5)
+            :WaitForChild("Services", 5)
+            :WaitForChild("TrainingAreasService", 5)
+            :WaitForChild("RE", 5)
+            :WaitForChild("KOTHStateChanged", 5)
+    end)
+    if ok and result then
+        KOTH_RE = result
+        return KOTH_RE
+    end
+    return nil
+end
 
 local kothState = {
     isClaimed      = false,
@@ -993,16 +1005,24 @@ local function updateKOTHPanel()
     kRowMyRank.Text = fmtA(myRebirths) .. " reb"
 end
 
--- Listen KOTH state changes
-KOTH_RE.OnClientEvent:Connect(function(data)
-    if type(data) == "table" then
-        kothState.isClaimed      = data.IsClaimed or false
-        kothState.kingName       = data.KingName or nil
-        kothState.kingUserId     = data.KingUserId or nil
-        kothState.claimStartedAt = data.ClaimStartedAt or 0
-        if activeTab == "koth" then
-            updateKOTHPanel()
-        end
+-- Listen KOTH state changes - connect bila RE ready
+task.spawn(function()
+    local re = getKOTH_RE()
+    if re then
+        re.OnClientEvent:Connect(function(data)
+            if type(data) == "table" then
+                kothState.isClaimed      = data.IsClaimed or false
+                kothState.kingName       = data.KingName or nil
+                kothState.kingUserId     = data.KingUserId or nil
+                kothState.claimStartedAt = data.ClaimStartedAt or 0
+                if activeTab == "koth" then
+                    updateKOTHPanel()
+                end
+            end
+        end)
+        print("[AutoHub] KOTH listener connected!")
+    else
+        print("[AutoHub] KOTH_RE not found!")
     end
 end)
 
