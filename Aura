@@ -54,10 +54,11 @@ local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
 
 local suffixes = {
-    {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
-    {1e33,"Dc"},{1e30,"No"},{1e27,"Oc"},{1e24,"Sp"},
-    {1e21,"Sx"},{1e18,"Qi"},{1e15,"Qa"},{1e12,"T"},
-    {1e9,"B"},  {1e6,"M"}, {1e3,"👑"},
+    {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
+    {1e51,"Sxd"},{1e48,"Qid"},{1e45,"Qad"},{1e42,"Td"},
+    {1e39,"Dd"}, {1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
+    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
+    {1e15,"Qa"},{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"👑"},
 }
 local function formatNum(n)
     for _,s in ipairs(suffixes) do
@@ -718,9 +719,11 @@ local kRebDot = Instance.new("Frame")
 kRebDot.Size = UDim2.new(0,10,0,10); kRebDot.Position = UDim2.new(0,2,0.5,-5)
 kRebDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebDot.BorderSizePixel = 0; kRebDot.Parent = kRebPill
 Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
+-- FIX: Hitbox parent kat PanelKOTH bukan kRebRow, position sama tapi ZIndex lebih tinggi supaya tak di-overlap kRebInputRow
 local kRebHitbox = Instance.new("TextButton")
-kRebHitbox.Size = UDim2.new(1,0,1,0); kRebHitbox.BackgroundTransparency = 1
-kRebHitbox.Text = ""; kRebHitbox.Parent = kRebRow
+kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,yK)
+kRebHitbox.BackgroundTransparency = 1; kRebHitbox.ZIndex = 3
+kRebHitbox.Text = ""; kRebHitbox.Parent = PanelKOTH
 yK = yK + ROW_H + GAP
 
 -- Input row: value + unit dropdown
@@ -768,9 +771,9 @@ kRebCount.TextColor3 = DIM; kRebCount.TextSize = 9; kRebCount.Font = Enum.Font.G
 kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = PanelKOTH
 yK = yK + STAT_H + GAP
 
--- Unit data
-local kRebUnitUnits  = {"Qd","Td","Dd","Ud","Dc","No","Oc","Sp","Sx","Qi","Qa"}
-local kRebUnitValues = {1e45,1e42,1e39,1e36,1e33,1e30,1e27,1e24,1e21,1e18,1e15}
+-- Unit data (smallest to largest, matching game order)
+local kRebUnitUnits  = {"Dd","Td","Qad","Qid","Sxd","Spd","Ocd","Nod","Uvg"}
+local kRebUnitValues = {1e39,1e42,1e45,1e48,1e51,1e54,1e57,1e60,1e63}
 
 local function updateKRebTarget()
     local n = tonumber(kRebInput.Text)
