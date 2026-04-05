@@ -1,4 +1,3 @@
-if game.PlaceId ~= 77393318863643 then return end
 -- Auto Hub v3 - Tab Edition
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
@@ -1343,6 +1342,38 @@ task.spawn(function()
     else
         rebuildConfigList()
     end
+end)
+
+
+-- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
+local TeleportService = game:GetService("TeleportService")
+local placeId = game.PlaceId
+
+-- Detect bila game nak teleport/shutdown
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.RequestedFromServer then
+        warn("[AutoHub] Server teleport detected - server shutting down/restarting")
+        task.wait(3)
+        pcall(function() TeleportService:Teleport(placeId, player) end)
+    end
+end)
+
+-- Detect kick message
+game:GetService("Players").LocalPlayer.Idled:Connect(function(time)
+    warn("[AutoHub] Player idle detected - " .. tostring(time) .. "s idle")
+end)
+
+-- Detect bila player kena remove (kick/disconnect)
+game:GetService("Players").PlayerRemoving:Connect(function(p)
+    if p == player then
+        warn("[AutoHub] LocalPlayer removing - possible kick or disconnect")
+    end
+end)
+
+-- Detect server close
+game:BindToClose(function()
+    warn("[AutoHub] Game closing - server shutdown")
+    pcall(function() TeleportService:Teleport(placeId, player) end)
 end)
 
 print("Auto Hub v3 loaded!")
