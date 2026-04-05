@@ -231,6 +231,7 @@ end
 local TabFarm   = makeTabBtn("⚡", 8)
 local TabConfig = makeTabBtn("💾", 50)
 local TabAnalyzer = makeTabBtn("📊", 92)
+local TabKOTH   = makeTabBtn("👑", 134)
 
 -- Active indicator bar
 local TabIndicator = Instance.new("Frame")
@@ -261,6 +262,8 @@ local PanelConfig = makeScrollPanel()
 PanelConfig.Visible = false
 local PanelAnalyzer = makeScrollPanel()
 PanelAnalyzer.Visible = false
+local PanelKOTH = makeScrollPanel()
+PanelKOTH.Visible = false
 
 -- ─── Row builder helpers (target panel = PanelFarm) ──────────────────────────
 local PAD_X = 10
@@ -809,6 +812,210 @@ yA = yA + 36
 
 PanelAnalyzer.CanvasSize = UDim2.new(0, 0, 0, yA + 4)
 
+-- ─── Build KOTH Panel ────────────────────────────────────────────────────────
+local KOTH_RE = RS
+    :WaitForChild("Packages")
+    :WaitForChild("Knit")
+    :WaitForChild("Services")
+    :WaitForChild("TrainingAreasService")
+    :WaitForChild("RE")
+    :WaitForChild("KOTHStateChanged")
+
+local kothState = {
+    isClaimed      = false,
+    kingName       = nil,
+    kingUserId     = nil,
+    claimStartedAt = 0,
+}
+
+local yK = GAP
+
+local function makeKRow(labelText, isGreen)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -10, 0, 19)
+    bg.Position = UDim2.new(0, 5, 0, yK)
+    bg.BackgroundTransparency = 1
+    bg.Parent = PanelKOTH
+    yK = yK + 21
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.5, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = isGreen and Color3.fromRGB(140, 220, 140) or Color3.fromRGB(150, 140, 180)
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = bg
+
+    local val = Instance.new("TextLabel")
+    val.Size = UDim2.new(0.5, 0, 1, 0)
+    val.Position = UDim2.new(0.5, 0, 0, 0)
+    val.BackgroundTransparency = 1
+    val.Text = "—"
+    val.TextColor3 = WHITE
+    val.TextSize = 9
+    val.Font = Enum.Font.Gotham
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.Parent = bg
+    return val
+end
+
+local function makeKDiv()
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(0.9, 0, 0, 1)
+    d.Position = UDim2.new(0.05, 0, 0, yK)
+    d.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+    d.BorderSizePixel = 0
+    d.Parent = PanelKOTH
+    yK = yK + 6
+end
+
+local function makeKSection(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -16, 0, SEC_H)
+    lbl.Position = UDim2.new(0, 12, 0, yK)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = WHITE
+    lbl.TextSize = 8
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = PanelKOTH
+    yK = yK + SEC_H + GAP
+end
+
+-- KOTH Status section
+makeKSection("KOTH STATUS")
+local kRowStatus   = makeKRow("Status:")
+local kRowKing     = makeKRow("King:")
+local kRowKingAura = makeKRow("King Aura:")
+local kRowMyAura   = makeKRow("My Aura:")
+local kRowResult   = makeKRow("Can Win:", true)
+local kRowTime     = makeKRow("Time held:")
+
+makeKDiv()
+makeKSection("MY STATS")
+local kRowMyRank   = makeKRow("My Rank:")
+
+-- Status dot indicator (besar, senang nampak)
+local kStatusDot = Instance.new("Frame")
+kStatusDot.Size = UDim2.new(0, 8, 0, 8)
+kStatusDot.Position = UDim2.new(0, 5, 0, 6)
+kStatusDot.BackgroundColor3 = Color3.fromRGB(100, 90, 130)
+kStatusDot.BorderSizePixel = 0
+kStatusDot.Parent = PanelKOTH
+Instance.new("UICorner", kStatusDot).CornerRadius = UDim.new(1, 0)
+
+PanelKOTH.CanvasSize = UDim2.new(0, 0, 0, yK + 4)
+
+-- ─── KOTH Logic ──────────────────────────────────────────────────────────────
+local function getKingAura()
+    if not kothState.kingName then return 0 end
+    local kingPlayer = game:GetService("Players"):FindFirstChild(kothState.kingName)
+    if kingPlayer then
+        return kingPlayer:GetAttribute("Aura") or 0
+    end
+    return 0
+end
+
+local function getKingRank()
+    if not kothState.kingName then return "—" end
+    local kingPlayer = game:GetService("Players"):FindFirstChild(kothState.kingName)
+    if kingPlayer then
+        local rebirths = kingPlayer:GetAttribute("Rebirths") or 0
+        return fmtA(rebirths) .. " reb"
+    end
+    return "not in server"
+end
+
+local function fmtDuration(secs)
+    secs = math.floor(secs)
+    if secs < 60 then return secs .. "s"
+    elseif secs < 3600 then return math.floor(secs/60) .. "m " .. (secs%60) .. "s"
+    else return math.floor(secs/3600) .. "h " .. math.floor((secs%3600)/60) .. "m" end
+end
+
+local function updateKOTHPanel()
+    local myAura = getAura()
+
+    if not kothState.isClaimed then
+        kStatusDot.BackgroundColor3 = GREEN
+        kRowStatus.Text   = "EMPTY ✓"
+        kRowStatus.TextColor3 = GREEN
+        kRowKing.Text     = "—"
+        kRowKingAura.Text = "—"
+        kRowMyAura.Text   = fmtA(myAura)
+        kRowResult.Text   = "Enter now!"
+        kRowResult.TextColor3 = GREEN
+        kRowTime.Text     = "—"
+    else
+        local kingAura = getKingAura()
+        local canWin   = myAura > kingAura
+        local timeSecs = kothState.claimStartedAt > 0
+            and (os.time() - kothState.claimStartedAt) or 0
+
+        kStatusDot.BackgroundColor3 = canWin and WARN or RED
+        kRowStatus.Text   = "OCCUPIED"
+        kRowStatus.TextColor3 = RED
+        kRowKing.Text     = kothState.kingName or "—"
+        kRowKing.TextColor3 = WHITE
+
+        if kingAura > 0 then
+            kRowKingAura.Text = fmtA(kingAura)
+            kRowKingAura.TextColor3 = canWin
+                and Color3.fromRGB(100, 255, 150)
+                or  Color3.fromRGB(255, 100, 100)
+        else
+            kRowKingAura.Text = "not in server"
+            kRowKingAura.TextColor3 = DIM
+        end
+
+        kRowMyAura.Text = fmtA(myAura)
+        kRowMyAura.TextColor3 = WHITE
+
+        if kingAura <= 0 then
+            kRowResult.Text = "Unknown (diff server)"
+            kRowResult.TextColor3 = WARN
+        elseif canWin then
+            kRowResult.Text = "YES — masuk!"
+            kRowResult.TextColor3 = GREEN
+        else
+            kRowResult.Text = "NO — hop server"
+            kRowResult.TextColor3 = RED
+        end
+
+        kRowTime.Text = fmtDuration(timeSecs)
+    end
+
+    -- My rank
+    local myRebirths = player:GetAttribute("Rebirths") or 0
+    kRowMyRank.Text = fmtA(myRebirths) .. " reb"
+end
+
+-- Listen KOTH state changes
+KOTH_RE.OnClientEvent:Connect(function(data)
+    if type(data) == "table" then
+        kothState.isClaimed      = data.IsClaimed or false
+        kothState.kingName       = data.KingName or nil
+        kothState.kingUserId     = data.KingUserId or nil
+        kothState.claimStartedAt = data.ClaimStartedAt or 0
+        if activeTab == "koth" then
+            updateKOTHPanel()
+        end
+    end
+end)
+
+-- Live update KOTH panel
+task.spawn(function()
+    while ScreenGui.Parent do
+        if activeTab == "koth" then
+            updateKOTHPanel()
+        end
+        task.wait(2)
+    end
+end)
+
 -- Scan logic
 aScanBtn.MouseButton1Click:Connect(function()
     if analyzerScanning then return end
@@ -932,7 +1139,7 @@ task.spawn(function()
 end)
 
 -- ─── Resize Main ─────────────────────────────────────────────────────────────
-local contentH = math.max(yF, yC, yA) + 4
+local contentH = math.max(yF, yC, yA, yK) + 4
 local fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
@@ -945,23 +1152,30 @@ local function switchTab(tab)
     PanelFarm.Visible     = (tab == "farm")
     PanelConfig.Visible   = (tab == "config")
     PanelAnalyzer.Visible = (tab == "analyzer")
+    PanelKOTH.Visible     = (tab == "koth")
 
     TabFarm.TextColor3     = tab == "farm"     and WHITE or DIM
     TabConfig.TextColor3   = tab == "config"   and WHITE or DIM
     TabAnalyzer.TextColor3 = tab == "analyzer" and WHITE or DIM
+    TabKOTH.TextColor3     = tab == "koth"     and WHITE or DIM
 
     TweenService:Create(TabFarm,     tweenInfo, {BackgroundTransparency = tab == "farm"     and 0.6 or 1}):Play()
     TweenService:Create(TabConfig,   tweenInfo, {BackgroundTransparency = tab == "config"   and 0.6 or 1}):Play()
     TweenService:Create(TabAnalyzer, tweenInfo, {BackgroundTransparency = tab == "analyzer" and 0.6 or 1}):Play()
+    TweenService:Create(TabKOTH,     tweenInfo, {BackgroundTransparency = tab == "koth"     and 0.6 or 1}):Play()
 
-    local indicatorY = tab == "farm" and 13 or tab == "config" and 55 or 97
+    local indicatorY = tab == "farm" and 13
+        or tab == "config"   and 55
+        or tab == "analyzer" and 97
+        or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, indicatorY)}):Play()
 end
 
 TabFarm.MouseButton1Click:Connect(function() switchTab("farm") end)
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
 TabAnalyzer.MouseButton1Click:Connect(function() switchTab("analyzer") end)
-switchTab("farm")  -- default
+TabKOTH.MouseButton1Click:Connect(function() switchTab("koth") end)
+switchTab("farm")
 
 -- ─── Popup ───────────────────────────────────────────────────────────────────
 local POPUP_W = 200
