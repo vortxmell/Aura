@@ -2,13 +2,23 @@
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local RequestRebirth = RS
-    :WaitForChild("Packages")
-    :WaitForChild("Knit")
-    :WaitForChild("Services")
-    :WaitForChild("PlayerService")
-    :WaitForChild("RF")
-    :WaitForChild("RequestRebirth")
+local RequestRebirth = nil
+task.spawn(function()
+    local ok2, result = pcall(function()
+        return RS
+            :WaitForChild("Packages", 15)
+            :WaitForChild("Knit", 15)
+            :WaitForChild("Services", 15)
+            :WaitForChild("PlayerService", 15)
+            :WaitForChild("RF", 15)
+            :WaitForChild("RequestRebirth", 15)
+    end)
+    if ok2 then
+        RequestRebirth = result
+    else
+        warn("[AutoHub] RequestRebirth not found: " .. tostring(result))
+    end
+end)
 
 local areas = {
     {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
