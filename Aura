@@ -1,3 +1,4 @@
+if game.PlaceId ~= 77393318863643 then return end
 -- Auto Hub v3 - Tab Edition
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
