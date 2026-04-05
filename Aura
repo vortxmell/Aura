@@ -32,7 +32,10 @@ local isRebirthing   = false
 local threshold      = 2
 local multiplier     = 2
 local comboTarget    = nil
-local autoKOTH       = false  -- NEW: Auto KOTH toggle
+local autoKOTH       = false
+local autoKOTH       = false
+local forceHop       = false   -- NEW: Force server hop toggle
+local kothHopping    = false   -- Lock supaya tak double-hop
 
 local suffixes = {
     {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
@@ -715,6 +718,24 @@ kAutoStatus.TextColor3 = DIM; kAutoStatus.TextSize = 9; kAutoStatus.Font = Enum.
 kAutoStatus.TextXAlignment = Enum.TextXAlignment.Left; kAutoStatus.Parent = PanelKOTH
 yK = yK + STAT_H + GAP
 
+-- Force Hop Button
+local kHopBtn = Instance.new("TextButton")
+kHopBtn.Size = UDim2.new(1,-10,0,20)
+kHopBtn.Position = UDim2.new(0,5,0,yK)
+kHopBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 140)
+kHopBtn.BorderSizePixel = 0
+kHopBtn.Text = "🔀 Force Server Hop"
+kHopBtn.TextColor3 = WHITE
+kHopBtn.TextSize = 10
+kHopBtn.Font = Enum.Font.GothamBold
+kHopBtn.Parent = PanelKOTH
+Instance.new("UICorner", kHopBtn).CornerRadius = UDim.new(0, 6)
+yK = yK + 20 + GAP
+
+kHopBtn.MouseButton1Click:Connect(function()
+    forceHop = true
+end)
+
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
 
 -- ─── KOTH Logic (Hitbox Polling) ─────────────────────────────────────────────
@@ -1312,6 +1333,68 @@ task.spawn(function()
     end
 end)
 
+-- ─── Server Hop Function ──────────────────────────────────────────────────────
+local TeleportService = game:GetService("TeleportService")  -- remove line 1458 duplicate lepas ni
+local placeId = game.PlaceId                                -- same, remove duplicate
+
+local function hopToLeastPopulated(reason)
+    if kothHopping then return end
+    kothHopping = true
+    kAutoStatus.Text = "🔄 Hopping... (" .. (reason or "?") .. ")"
+    kAutoStatus.TextColor3 = WARN
+
+    task.spawn(function()
+        local currentJobId = game.JobId
+        local bestServer = nil
+        local bestCount = math.huge
+        local cursor = ""
+
+        for page = 1, 3 do
+            local url = string.format(
+                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+                placeId
+            )
+            if cursor ~= "" then url = url .. "&cursor=" .. cursor end
+
+            local ok2, result = pcall(function() return game:HttpGet(url) end)
+            if not ok2 then break end
+
+            local ok3, data = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(result)
+            end)
+            if not ok3 or not data or not data.data then break end
+
+            for _, server in ipairs(data.data) do
+                if server.id ~= currentJobId and server.playing ~= nil then
+                    if server.playing < bestCount then
+                        bestCount = server.playing
+                        bestServer = server
+                    end
+                end
+            end
+
+            if data.nextPageCursor and data.nextPageCursor ~= "" then
+                cursor = data.nextPageCursor
+            else
+                break
+            end
+        end
+
+        if bestServer then
+            kAutoStatus.Text = string.format("🚀 Hopping → %d player(s)", bestCount)
+            task.wait(1)
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, bestServer.id, player)
+            end)
+        else
+            kAutoStatus.Text = "❌ No server found"
+            kAutoStatus.TextColor3 = RED
+            task.wait(3)
+            kothHopping = false
+        end
+    end)
+end
+
 -- ─── NEW: Auto KOTH Loop ──────────────────────────────────────────────────────
 task.spawn(function()
     local KOTH_POS = Vector3.new(-118, 32, 123)
@@ -1455,8 +1538,6 @@ task.spawn(function()
 end)
 
 -- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
-local TeleportService = game:GetService("TeleportService")
-local placeId = game.PlaceId
 
 game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.RequestedFromServer then
