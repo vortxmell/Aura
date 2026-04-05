@@ -771,7 +771,7 @@ local function updateKOTHPanel()
 end
 
 -- --- Resize Main ---
-contentH = math.max(yF, yC, yA, yK) + 4
+contentH = math.max(yF, yC, yK) + 4
 fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
