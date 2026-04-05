@@ -1099,7 +1099,7 @@ local function rebuildConfigList()
     btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20,100,30) or Color3.fromRGB(60,40,10)
     local hasAny = false
     for name, _ in pairs(configs) do
-        if name == AUTOLOAD_KEY then continue end
+        if name ~= AUTOLOAD_KEY then
         hasAny = true
         local isAuto = autoLoadName == name
         local isSel  = selectedCfg == name
@@ -1113,6 +1113,7 @@ local function rebuildConfigList()
         item.TextXAlignment = Enum.TextXAlignment.Left; item.Parent = configList
         Instance.new("UICorner", item).CornerRadius = UDim.new(0,4)
         item.MouseButton1Click:Connect(function() selectedCfg = name; rebuildConfigList() end)
+        end -- close if name ~= AUTOLOAD_KEY
     end
     if not hasAny then
         local empty = Instance.new("TextLabel")
