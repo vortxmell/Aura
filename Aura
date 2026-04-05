@@ -1344,4 +1344,25 @@ task.spawn(function()
     end
 end)
 
+
+-- ─── Auto Rejoin ─────────────────────────────────────────────────────────────
+local TeleportService = game:GetService("TeleportService")
+local placeId = game.PlaceId
+
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.RequestedFromServer then
+        task.wait(3)
+        pcall(function()
+            TeleportService:Teleport(placeId, player)
+        end)
+    end
+end)
+
+-- Detect server shutdown / kick back to spawn and auto rejoin
+game:BindToClose(function()
+    pcall(function()
+        TeleportService:Teleport(placeId, player)
+    end)
+end)
+
 print("Auto Hub v3 loaded!")
