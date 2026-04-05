@@ -1314,7 +1314,7 @@ end)
 
 -- ─── NEW: Auto KOTH Loop ──────────────────────────────────────────────────────
 task.spawn(function()
-    local KOTH_POS = Vector3.new(-115, 28, 115)
+    local KOTH_POS = Vector3.new(-118, 32, 123)
     while ScreenGui.Parent do
         if autoKOTH then
             if isInKOTH() then
