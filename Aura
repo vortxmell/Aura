@@ -768,47 +768,13 @@ kRebCount.TextColor3 = DIM; kRebCount.TextSize = 9; kRebCount.Font = Enum.Font.G
 kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = PanelKOTH
 yK = yK + STAT_H + GAP
 
--- Unit dropdown popup (parented to ScreenGui so it float above everything)
-local kRebUnitUnits = {"Qd","Td","Dd","Ud","Dc","No","Oc","Sp","Sx","Qi","Qa"}
+-- Unit data
+local kRebUnitUnits  = {"Qd","Td","Dd","Ud","Dc","No","Oc","Sp","Sx","Qi","Qa"}
 local kRebUnitValues = {1e45,1e42,1e39,1e36,1e33,1e30,1e27,1e24,1e21,1e18,1e15}
-
-local kRebDropdown = Instance.new("Frame")
-kRebDropdown.Size = UDim2.new(0,60,0, (#kRebUnitUnits * 20) + 4)
-kRebDropdown.BackgroundColor3 = Color3.fromRGB(20,16,32); kRebDropdown.BorderSizePixel = 0
-kRebDropdown.ZIndex = 20; kRebDropdown.Visible = false; kRebDropdown.Parent = ScreenGui
-Instance.new("UICorner", kRebDropdown).CornerRadius = UDim.new(0,6)
-local kRebDropStroke = Instance.new("UIStroke", kRebDropdown)
-kRebDropStroke.Color = PURPLE; kRebDropStroke.Thickness = 1
-
-local kRebUnitBtns = {}
-for idx, unit in ipairs(kRebUnitUnits) do
-    local item = Instance.new("TextButton")
-    item.Size = UDim2.new(1,0,0,20); item.Position = UDim2.new(0,0,0,(idx-1)*20+2)
-    item.BackgroundTransparency = 1; item.BorderSizePixel = 0
-    item.Text = unit; item.TextColor3 = WHITE
-    item.TextSize = 10; item.Font = Enum.Font.GothamBold
-    item.ZIndex = 21; item.Parent = kRebDropdown
-    kRebUnitBtns[idx] = item
-end
-
-local kRebDropOpen = false
-local function closeKRebDrop()
-    kRebDropdown.Visible = false; kRebDropOpen = false
-end
-local function openKRebDrop()
-    -- Position dropdown below the unit button
-    local absPos = kRebUnitBtn.AbsolutePosition
-    local absSize = kRebUnitBtn.AbsoluteSize
-    kRebDropdown.Position = UDim2.new(0, absPos.X, 0, absPos.Y + absSize.Y + 2)
-    kRebDropdown.Visible = true; kRebDropOpen = true
-end
 
 local function updateKRebTarget()
     local n = tonumber(kRebInput.Text)
-    if n and n > 0 then
-        kothRebirthVal = n
-    end
-    -- find unit multiplier
+    if n and n > 0 then kothRebirthVal = n end
     for i, u in ipairs(kRebUnitUnits) do
         if u == kothRebirthUnit then
             kothRebirthTarget = kothRebirthVal * kRebUnitValues[i]
@@ -817,43 +783,131 @@ local function updateKRebTarget()
     end
 end
 
-kRebUnitBtn.MouseButton1Click:Connect(function()
-    if kRebDropOpen then closeKRebDrop() else openKRebDrop() end
-end)
+-- === UNIT PICKER POPUP (same style as target popup) ===
+local UPOP_W = 160
+local UPOP_ITEM_H = 22
+local UPOP_H = 32 + (#kRebUnitUnits * (UPOP_ITEM_H + 2)) + 32
 
-for idx, item in ipairs(kRebUnitBtns) do
-    item.MouseButton1Click:Connect(function()
-        kothRebirthUnit = kRebUnitUnits[idx]
-        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
-        -- highlight selected
-        for _, b in ipairs(kRebUnitBtns) do
-            b.TextColor3 = WHITE
-        end
-        item.TextColor3 = Color3.fromRGB(180,120,255)
-        updateKRebTarget()
-        closeKRebDrop()
+local UBackdrop = Instance.new("TextButton")
+UBackdrop.Size = UDim2.new(1,0,1,0); UBackdrop.BackgroundColor3 = Color3.fromRGB(0,0,0)
+UBackdrop.BackgroundTransparency = 0.5; UBackdrop.BorderSizePixel = 0
+UBackdrop.Text = ""; UBackdrop.ZIndex = 10; UBackdrop.Visible = false
+UBackdrop.Parent = ScreenGui
+
+local UPopup = Instance.new("Frame")
+UPopup.Size = UDim2.new(0,UPOP_W,0,UPOP_H)
+UPopup.Position = UDim2.new(0.5,-UPOP_W/2,0.5,-UPOP_H/2)
+UPopup.BackgroundColor3 = Color3.fromRGB(15,12,22); UPopup.BorderSizePixel = 0
+UPopup.ZIndex = 11; UPopup.Visible = false; UPopup.Parent = ScreenGui
+Instance.new("UICorner", UPopup).CornerRadius = UDim.new(0,12)
+local UPopStroke = Instance.new("UIStroke", UPopup)
+UPopStroke.Color = Color3.fromRGB(80,60,120); UPopStroke.Thickness = 1
+
+local UPopTitle = Instance.new("TextLabel")
+UPopTitle.Size = UDim2.new(1,-16,0,28); UPopTitle.Position = UDim2.new(0,10,0,4)
+UPopTitle.BackgroundTransparency = 1; UPopTitle.Text = "Select Unit"
+UPopTitle.TextColor3 = WHITE; UPopTitle.TextSize = 11; UPopTitle.Font = Enum.Font.GothamBold
+UPopTitle.TextXAlignment = Enum.TextXAlignment.Left; UPopTitle.ZIndex = 12; UPopTitle.Parent = UPopup
+
+local UPopDiv = Instance.new("Frame")
+UPopDiv.Size = UDim2.new(0.9,0,0,1); UPopDiv.Position = UDim2.new(0.05,0,0,30)
+UPopDiv.BackgroundColor3 = Color3.fromRGB(60,45,90); UPopDiv.BorderSizePixel = 0
+UPopDiv.ZIndex = 12; UPopDiv.Parent = UPopup
+
+local uPopItems = {}
+local uSelectedIdx = nil
+local uListStartY = 36
+
+for i, unit in ipairs(kRebUnitUnits) do
+    local itemY = uListStartY + (i-1)*(UPOP_ITEM_H+2)
+    local Item = Instance.new("Frame")
+    Item.Size = UDim2.new(1,-16,0,UPOP_ITEM_H); Item.Position = UDim2.new(0,8,0,itemY)
+    Item.BackgroundColor3 = Color3.fromRGB(25,20,38); Item.BackgroundTransparency = 1
+    Item.BorderSizePixel = 0; Item.ZIndex = 12; Item.Parent = UPopup
+    Instance.new("UICorner", Item).CornerRadius = UDim.new(0,6)
+    local Dot = Instance.new("Frame")
+    Dot.Size = UDim2.new(0,7,0,7); Dot.Position = UDim2.new(0,6,0.5,-3)
+    Dot.BackgroundColor3 = DIM; Dot.BorderSizePixel = 0; Dot.ZIndex = 13; Dot.Parent = Item
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
+    local NameLbl = Instance.new("TextLabel")
+    NameLbl.Size = UDim2.new(1,-20,1,0); NameLbl.Position = UDim2.new(0,18,0,0)
+    NameLbl.BackgroundTransparency = 1; NameLbl.Text = unit; NameLbl.TextColor3 = WHITE
+    NameLbl.TextSize = 11; NameLbl.Font = Enum.Font.GothamBold
+    NameLbl.TextXAlignment = Enum.TextXAlignment.Left; NameLbl.ZIndex = 13; NameLbl.Parent = Item
+    local CheckLbl = Instance.new("TextLabel")
+    CheckLbl.Size = UDim2.new(0,14,1,0); CheckLbl.Position = UDim2.new(1,-16,0,0)
+    CheckLbl.BackgroundTransparency = 1; CheckLbl.Text = ""
+    CheckLbl.TextColor3 = Color3.fromRGB(100,220,100); CheckLbl.TextSize = 10
+    CheckLbl.Font = Enum.Font.GothamBold; CheckLbl.ZIndex = 13; CheckLbl.Parent = Item
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1,0,1,0); Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""; Hitbox.ZIndex = 14; Hitbox.Parent = Item
+    uPopItems[i] = {frame=Item, dot=Dot, nameLbl=NameLbl, checkLbl=CheckLbl, hitbox=Hitbox}
+end
+
+local uBtnY = uListStartY + (#kRebUnitUnits*(UPOP_ITEM_H+2)) + 6
+local UCancelBtn = Instance.new("TextButton")
+UCancelBtn.Size = UDim2.new(0.44,0,0,22); UCancelBtn.Position = UDim2.new(0.04,0,0,uBtnY)
+UCancelBtn.BackgroundColor3 = Color3.fromRGB(40,35,55); UCancelBtn.BorderSizePixel = 0
+UCancelBtn.Text = "Cancel"; UCancelBtn.TextColor3 = WHITE; UCancelBtn.TextSize = 10
+UCancelBtn.Font = Enum.Font.GothamBold; UCancelBtn.ZIndex = 12; UCancelBtn.Parent = UPopup
+Instance.new("UICorner", UCancelBtn).CornerRadius = UDim.new(0,6)
+
+local USetBtn = Instance.new("TextButton")
+USetBtn.Size = UDim2.new(0.44,0,0,22); USetBtn.Position = UDim2.new(0.52,0,0,uBtnY)
+USetBtn.BackgroundColor3 = PURPLE; USetBtn.BorderSizePixel = 0
+USetBtn.Text = "Set"; USetBtn.TextColor3 = WHITE; USetBtn.TextSize = 10
+USetBtn.Font = Enum.Font.GothamBold; USetBtn.ZIndex = 12; USetBtn.Parent = UPopup
+Instance.new("UICorner", USetBtn).CornerRadius = UDim.new(0,6)
+
+local function refreshUPopItems()
+    for i, item in ipairs(uPopItems) do
+        local isSel = uSelectedIdx == i
+        local isCurrent = kRebUnitUnits[i] == kothRebirthUnit
+        item.frame.BackgroundTransparency = isSel and 0 or 1
+        item.frame.BackgroundColor3 = isSel and Color3.fromRGB(50,35,80) or Color3.fromRGB(25,20,38)
+        item.dot.BackgroundColor3 = isSel and PURPLE or DIM
+        item.checkLbl.Text = isCurrent and "✓" or ""
+    end
+end
+
+local function openUnitPopup()
+    uSelectedIdx = nil
+    for i, u in ipairs(kRebUnitUnits) do
+        if u == kothRebirthUnit then uSelectedIdx = i; break end
+    end
+    refreshUPopItems()
+    UBackdrop.Visible = true; UPopup.Visible = true
+end
+
+local function closeUnitPopup()
+    UBackdrop.Visible = false; UPopup.Visible = false; uSelectedIdx = nil
+end
+
+for i, item in ipairs(uPopItems) do
+    item.hitbox.MouseButton1Click:Connect(function()
+        uSelectedIdx = i; refreshUPopItems()
     end)
 end
 
+UCancelBtn.MouseButton1Click:Connect(closeUnitPopup)
+UBackdrop.MouseButton1Click:Connect(closeUnitPopup)
+kRebUnitBtn.MouseButton1Click:Connect(openUnitPopup)
+
+USetBtn.MouseButton1Click:Connect(function()
+    if not uSelectedIdx then closeUnitPopup(); return end
+    kothRebirthUnit = kRebUnitUnits[uSelectedIdx]
+    kRebUnitBtn.Text = kothRebirthUnit .. " ›"
+    updateKRebTarget()
+    closeUnitPopup()
+end)
+
 kRebInput.FocusLost:Connect(function()
     local n = tonumber(kRebInput.Text)
-    if not n or n <= 0 then kRebInput.Text = tostring(kothRebirthVal) return end
+    if not n or n <= 0 then kRebInput.Text = tostring(kothRebirthVal); return end
     kothRebirthVal = n
     kRebInput.Text = tostring(kothRebirthVal)
     updateKRebTarget()
-end)
-
--- Close dropdown kalau click luar
-ScreenGui.DescendantAdded:Connect(function() end) -- dummy
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if kRebDropOpen and input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local pos = input.Position
-        local dPos = kRebDropdown.AbsolutePosition
-        local dSize = kRebDropdown.AbsoluteSize
-        if pos.X < dPos.X or pos.X > dPos.X+dSize.X or pos.Y < dPos.Y or pos.Y > dPos.Y+dSize.Y then
-            closeKRebDrop()
-        end
-    end
 end)
 
 local kothRebirthCount = 0
