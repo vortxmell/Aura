@@ -1,4 +1,4 @@
--- Auto Hub v3 - Tab Edition
+-- Auto Hub v3 - Tab Edition (+ KOTH Auto Enter)
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -26,6 +26,7 @@ local autoRebirth    = false
 local autoCombo      = false
 local zoneGuard      = false
 local multiplierOn   = false
+local autoEnterKOTH  = false   -- NEW
 local currentArea    = nil
 local rebirthCount   = 0
 local isRebirthing   = false
@@ -679,10 +680,73 @@ makeKDiv()
 makeKSection("MY STATS")
 local kRowMyRank = makeKRow("My Rank:")
 
+-- ─── NEW: AUTO ENTER KOTH UI ──────────────────────────────────────────────────
+makeKDiv()
+makeKSection("AUTO ENTER")
+
+local kAutoEnterRowY = yK
+yK = yK + ROW_H + GAP
+
+local kAutoEnterFrame = Instance.new("Frame")
+kAutoEnterFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+kAutoEnterFrame.Position = UDim2.new(0, PAD_X, 0, kAutoEnterRowY)
+kAutoEnterFrame.BackgroundColor3 = PANEL
+kAutoEnterFrame.BorderSizePixel = 0
+kAutoEnterFrame.Parent = PanelKOTH
+Instance.new("UICorner", kAutoEnterFrame).CornerRadius = UDim.new(0, 6)
+local kAutoEnterStroke = Instance.new("UIStroke", kAutoEnterFrame)
+kAutoEnterStroke.Color = Color3.fromRGB(60, 45, 90)
+kAutoEnterStroke.Thickness = 1
+
+local kAutoEnterLabel = Instance.new("TextLabel")
+kAutoEnterLabel.Size = UDim2.new(1, -50, 1, 0)
+kAutoEnterLabel.Position = UDim2.new(0, 8, 0, 0)
+kAutoEnterLabel.BackgroundTransparency = 1
+kAutoEnterLabel.Text = "Auto Enter"
+kAutoEnterLabel.TextColor3 = WHITE
+kAutoEnterLabel.TextSize = 10
+kAutoEnterLabel.Font = Enum.Font.GothamBold
+kAutoEnterLabel.TextXAlignment = Enum.TextXAlignment.Left
+kAutoEnterLabel.Parent = kAutoEnterFrame
+
+local kAutoEnterPill = Instance.new("Frame")
+kAutoEnterPill.Size = UDim2.new(0, 28, 0, 14)
+kAutoEnterPill.Position = UDim2.new(1, -36, 0.5, -7)
+kAutoEnterPill.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
+kAutoEnterPill.BorderSizePixel = 0
+kAutoEnterPill.Parent = kAutoEnterFrame
+Instance.new("UICorner", kAutoEnterPill).CornerRadius = UDim.new(1, 0)
+
+local kAutoEnterDot = Instance.new("Frame")
+kAutoEnterDot.Size = UDim2.new(0, 10, 0, 10)
+kAutoEnterDot.Position = UDim2.new(0, 2, 0.5, -5)
+kAutoEnterDot.BackgroundColor3 = Color3.fromRGB(100, 90, 130)
+kAutoEnterDot.BorderSizePixel = 0
+kAutoEnterDot.Parent = kAutoEnterPill
+Instance.new("UICorner", kAutoEnterDot).CornerRadius = UDim.new(1, 0)
+
+local kAutoEnterHitbox = Instance.new("TextButton")
+kAutoEnterHitbox.Size = UDim2.new(1, 0, 1, 0)
+kAutoEnterHitbox.BackgroundTransparency = 1
+kAutoEnterHitbox.Text = ""
+kAutoEnterHitbox.Parent = kAutoEnterFrame
+
+-- Status label
+local kAutoEnterStatus = Instance.new("TextLabel")
+kAutoEnterStatus.Size = UDim2.new(1, -10, 0, 14)
+kAutoEnterStatus.Position = UDim2.new(0, 5, 0, yK)
+kAutoEnterStatus.BackgroundTransparency = 1
+kAutoEnterStatus.Text = "Status: Off"
+kAutoEnterStatus.TextColor3 = DIM
+kAutoEnterStatus.TextSize = 9
+kAutoEnterStatus.Font = Enum.Font.Gotham
+kAutoEnterStatus.TextXAlignment = Enum.TextXAlignment.Left
+kAutoEnterStatus.Parent = PanelKOTH
+yK = yK + 18
+
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
 
 -- ─── KOTH Logic (Hitbox Polling) ─────────────────────────────────────────────
--- Guna workspace.KOTH.AreaHitbox — confirmed berjaya detect player dalam KOTH
 local kothHitbox = nil
 pcall(function()
     kothHitbox = workspace:WaitForChild("KOTH", 10):WaitForChild("AreaHitbox", 10)
@@ -765,7 +829,6 @@ local function switchTab(tab)
     local indicatorY = tab=="farm" and 13 or tab=="config" and 55 or tab=="analyzer" and 97 or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0,indicatorY)}):Play()
 
-    -- Update KOTH panel terus bila switch ke tab tu
     if tab == "koth" then updateKOTHPanel() end
 end
 
@@ -1131,7 +1194,7 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    autoTraining = false; autoRebirth = false; autoCombo = false; zoneGuard = false
+    autoTraining = false; autoRebirth = false; autoCombo = false; zoneGuard = false; autoEnterKOTH = false
     ScreenGui:Destroy()
 end)
 
@@ -1153,6 +1216,19 @@ end)
 ZoneBtn.MouseButton1Click:Connect(function()
     zoneGuard = not zoneGuard
     setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard); autoSave()
+end)
+
+-- ─── NEW: Auto Enter KOTH Toggle ─────────────────────────────────────────────
+kAutoEnterHitbox.MouseButton1Click:Connect(function()
+    autoEnterKOTH = not autoEnterKOTH
+    setToggle(kAutoEnterPill, kAutoEnterDot, kAutoEnterStroke, autoEnterKOTH)
+    if autoEnterKOTH then
+        kAutoEnterStatus.Text = "Scanning..."
+        kAutoEnterStatus.TextColor3 = WARN
+    else
+        kAutoEnterStatus.Text = "Status: Off"
+        kAutoEnterStatus.TextColor3 = DIM
+    end
 end)
 
 -- ─── Respawn ──────────────────────────────────────────────────────────────────
@@ -1238,6 +1314,43 @@ task.spawn(function()
             updateKOTHPanel()
         end
         task.wait(2)
+    end
+end)
+
+-- ─── NEW: KOTH Auto Enter Loop ────────────────────────────────────────────────
+local KOTH_POS = Vector3.new(-115, 28, 115)
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        if autoEnterKOTH then
+            local myAura = getAura()
+            local claimed, kingName, kingAura = getKOTHStatus()
+
+            if not claimed then
+                -- KOTH kosong, terus masuk
+                kAutoEnterStatus.Text = "Empty! Entering..."
+                kAutoEnterStatus.TextColor3 = GREEN
+                teleport(KOTH_POS)
+                task.wait(3)
+                kAutoEnterStatus.Text = "✓ Inside KOTH"
+                kAutoEnterStatus.TextColor3 = GREEN
+
+            elseif myAura > kingAura then
+                -- Ada orang tapi aura dia lebih rendah, masuk
+                kAutoEnterStatus.Text = "Weak king! Entering..."
+                kAutoEnterStatus.TextColor3 = WARN
+                teleport(KOTH_POS)
+                task.wait(3)
+                kAutoEnterStatus.Text = "✓ Inside KOTH"
+                kAutoEnterStatus.TextColor3 = GREEN
+
+            else
+                -- King lebih kuat, tunggu
+                kAutoEnterStatus.Text = "King stronger, waiting..."
+                kAutoEnterStatus.TextColor3 = RED
+            end
+        end
+        task.wait(3)
     end
 end)
 
@@ -1379,4 +1492,4 @@ game:BindToClose(function()
     pcall(function() TeleportService:Teleport(placeId, player) end)
 end)
 
-print("Auto Hub v3 loaded! KOTH = hitbox polling")
+print("Auto Hub v3 loaded! KOTH Auto Enter ready.")
