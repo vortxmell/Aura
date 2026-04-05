@@ -1286,26 +1286,45 @@ task.spawn(function()
 end)
 
 -- ─── NEW: Auto KOTH Loop ──────────────────────────────────────────────────────
+local function isInKOTH()
+    if not kothHitbox then return false end
+    local c = player.Character
+    if not c then return false end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local ok2, parts = pcall(function()
+        return workspace:GetPartsInPart(kothHitbox)
+    end)
+    if not ok2 or not parts then return false end
+    for _, part in ipairs(parts) do
+        if part:IsDescendantOf(c) then return true end
+    end
+    return false
+end
+
 task.spawn(function()
     local KOTH_POS = Vector3.new(-115, 28, 115)
     while ScreenGui.Parent do
         if autoKOTH then
-            local myAura = getAura()
-            local claimed, kingName, kingAura = getKOTHStatus()
-            if not claimed then
-                -- KOTH kosong, terus masuk
-                kAutoStatus.Text = "Empty — entering!"
+            -- Check dulu kita sendiri ada dalam KOTH ke tak
+            if isInKOTH() then
+                kAutoStatus.Text = "👑 Holding KOTH!"
                 kAutoStatus.TextColor3 = GREEN
-                teleport(KOTH_POS)
-            elseif myAura > kingAura then
-                -- King aura rendah dari kita, masuk
-                kAutoStatus.Text = "King weak — entering!"
-                kAutoStatus.TextColor3 = WARN
-                teleport(KOTH_POS)
             else
-                -- King lebih kuat, tunggu
-                kAutoStatus.Text = "King strong — waiting"
-                kAutoStatus.TextColor3 = RED
+                local myAura = getAura()
+                local claimed, kingName, kingAura = getKOTHStatus()
+                if not claimed then
+                    kAutoStatus.Text = "Empty — entering!"
+                    kAutoStatus.TextColor3 = GREEN
+                    teleport(KOTH_POS)
+                elseif myAura > kingAura then
+                    kAutoStatus.Text = "King weak — entering!"
+                    kAutoStatus.TextColor3 = WARN
+                    teleport(KOTH_POS)
+                else
+                    kAutoStatus.Text = "King strong — waiting"
+                    kAutoStatus.TextColor3 = RED
+                end
             end
         end
         task.wait(3)
