@@ -1,14 +1,19 @@
--- Auto Hub v3 - Tab Edition
+-- Auto Hub v3 - Tab Edition (Fixed)
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local RequestRebirth = RS
-    :WaitForChild("Packages")
-    :WaitForChild("Knit")
-    :WaitForChild("Services")
-    :WaitForChild("PlayerService")
-    :WaitForChild("RF")
-    :WaitForChild("RequestRebirth")
+
+-- ─── FIXED: Safe WaitForChild dengan timeout + nil check ─────────────────────
+local _pkg = RS:WaitForChild("Packages", 10)
+local _knit = _pkg and _pkg:WaitForChild("Knit", 10)
+local _svc = _knit and _knit:WaitForChild("Services", 10)
+local _ps = _svc and _svc:WaitForChild("PlayerService", 10)
+local _rf = _ps and _ps:WaitForChild("RF", 10)
+local RequestRebirth = _rf and _rf:WaitForChild("RequestRebirth", 10)
+
+if not RequestRebirth then
+    warn("[AutoHub] RequestRebirth tidak jumpa - Auto Rebirth akan disabled")
+end
 
 local areas = {
     {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
@@ -240,8 +245,8 @@ end
 
 local TabFarm     = makeTabBtn("⚡", 8)
 local TabConfig   = makeTabBtn("💾", 50)
-local TabKOTH     = makeTabBtn("👑", 92)   -- KOTH tab (sebelum Analyzer)
-local TabAnalyzer = makeTabBtn("📊", 134)  -- Analyzer turun ke bawah
+local TabKOTH     = makeTabBtn("👑", 92)
+local TabAnalyzer = makeTabBtn("📊", 134)
 
 -- Active indicator bar
 local TabIndicator = Instance.new("Frame")
@@ -746,7 +751,6 @@ end
 
 local kRef = {yK}
 
--- Title
 local kTitle = Instance.new("TextLabel")
 kTitle.Size = UDim2.new(1, -16, 0, 14)
 kTitle.Position = UDim2.new(0, 8, 0, kRef[1])
@@ -759,29 +763,24 @@ kTitle.TextXAlignment = Enum.TextXAlignment.Left
 kTitle.Parent = PanelKOTH
 kRef[1] = kRef[1] + 18
 
--- Divider
 local kd1 = Instance.new("Frame")
 kd1.Size = UDim2.new(0.9, 0, 0, 1); kd1.Position = UDim2.new(0.05, 0, 0, kRef[1])
 kd1.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd1.BorderSizePixel = 0; kd1.Parent = PanelKOTH
 kRef[1] = kRef[1] + 6
 
--- Toggle
 local KOTHBtn, KOTHPill, KOTHDot, KOTHStroke = makeKToggleRow("Auto KOTH", PanelKOTH, kRef)
 
--- Divider
 local kd2 = Instance.new("Frame")
 kd2.Size = UDim2.new(0.9, 0, 0, 1); kd2.Position = UDim2.new(0.05, 0, 0, kRef[1])
 kd2.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd2.BorderSizePixel = 0; kd2.Parent = PanelKOTH
 kRef[1] = kRef[1] + 6
 
--- Status rows
 local kRowStatus = makeKRow("KOTH Status:", PanelKOTH, kRef, Color3.fromRGB(100, 220, 255))
 local kRowKing   = makeKRow("King:", PanelKOTH, kRef, GOLD)
 local kRowKingA  = makeKRow("King Aura:", PanelKOTH, kRef, Color3.fromRGB(255, 150, 80))
 local kRowMyA    = makeKRow("Your Aura:", PanelKOTH, kRef, GREEN)
 local kRowResult = makeKRow("Result:", PanelKOTH, kRef, WHITE)
 
--- Divider
 local kd3 = Instance.new("Frame")
 kd3.Size = UDim2.new(0.9, 0, 0, 1); kd3.Position = UDim2.new(0.05, 0, 0, kRef[1])
 kd3.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd3.BorderSizePixel = 0; kd3.Parent = PanelKOTH
@@ -789,7 +788,6 @@ kRef[1] = kRef[1] + 6
 
 local kRowHops = makeKRow("Server Hops:", PanelKOTH, kRef, DIM)
 
--- Force Hop button
 kRef[1] = kRef[1] + 4
 local kHopBtn = Instance.new("TextButton")
 kHopBtn.Size = UDim2.new(1, -16, 0, 26)
@@ -1142,7 +1140,6 @@ local AreaStatusChanged = RS:FindFirstChild("Packages") and
     RS.Packages.Knit.Services.KOTHService:FindFirstChild("RE") and
     RS.Packages.Knit.Services.KOTHService.RE:FindFirstChild("AreaStatusChanged")
 
--- Fallback: scan seluruh RS untuk cari remote yang betul
 local function findRemote(name)
     local function search(obj)
         for _, v in ipairs(obj:GetDescendants()) do
@@ -1161,19 +1158,16 @@ if not AreaStatusChanged then
     AreaStatusChanged = findRemote("AreaStatusChanged")
 end
 
--- Listen KOTHStateChanged
 if KOTHStateChanged then
     KOTHStateChanged.OnClientEvent:Connect(function(data)
         if not data then return end
         kothClaimed = data.IsClaimed or false
 
         if kothClaimed then
-            -- Ada orang dalam KOTH
             local kingId = data.KingUserId
             kothKingName = "—"
             kothKingAura = 0
 
-            -- Cari player dengan UserId tu dalam server semasa
             if kingId then
                 for _, p in ipairs(game.Players:GetPlayers()) do
                     if p.UserId == kingId then
@@ -1186,24 +1180,19 @@ if KOTHStateChanged then
 
             updateKOTHUI()
 
-            -- Auto KOTH logic
             if autoKOTH and not isInKOTH then
                 if kothKingAura > 0 and getAura() > kothKingAura then
-                    -- Kau lagi kuat, masuk
                     task.wait(0.5)
                     teleport(kothPos)
                     isInKOTH = true
                 elseif kothKingAura > 0 then
-                    -- Dia lagi kuat, server hop
                     doServerHop()
                 end
-                -- Kalau kingId tak jumpa dalam server (lain server), hop
                 if kothKingAura == 0 and kingId then
                     doServerHop()
                 end
             end
         else
-            -- KOTH kosong
             kothKingName = "—"
             kothKingAura = 0
             updateKOTHUI()
@@ -1217,7 +1206,6 @@ if KOTHStateChanged then
     end)
 end
 
--- Listen AreaStatusChanged — kau kena reject/kalah
 if AreaStatusChanged then
     AreaStatusChanged.OnClientEvent:Connect(function()
         if autoKOTH and isInKOTH then
@@ -1229,11 +1217,10 @@ if AreaStatusChanged then
     end)
 end
 
--- ─── KOTH Live Update (every 2s) ─────────────────────────────────────────────
+-- ─── KOTH Live Update ────────────────────────────────────────────────────────
 task.spawn(function()
     while ScreenGui.Parent do
         if activeTab == "koth" then
-            -- Update aura kau dan king secara live
             kRowMyA.Text = formatNum(getAura())
             if kothKingName ~= "—" then
                 for _, p in ipairs(game.Players:GetPlayers()) do
@@ -1243,7 +1230,6 @@ task.spawn(function()
                     end
                 end
                 kRowKingA.Text = formatNum(kothKingAura)
-                -- Update result
                 if kothClaimed and kothKingAura > 0 then
                     if getAura() > kothKingAura then
                         kRowResult.Text = "✅ Can Win"
@@ -1621,12 +1607,15 @@ task.spawn(function()
     end
 end)
 
+-- ─── FIXED: Nil check sebelum InvokeServer ───────────────────────────────────
 task.spawn(function()
     while true do
         if autoRebirth and not isRebirthing then
-            RequestRebirth:InvokeServer()
-            rebirthCount += 1
-            RebirthLabel.Text = "Rebirths: " .. rebirthCount
+            if RequestRebirth then
+                RequestRebirth:InvokeServer()
+                rebirthCount += 1
+                RebirthLabel.Text = "Rebirths: " .. rebirthCount
+            end
             task.wait(0.1)
         else task.wait(0.1) end
     end
@@ -1639,9 +1628,11 @@ task.spawn(function()
             local rebirthAt = comboTarget.req * threshold
             if aura >= rebirthAt then
                 isRebirthing = true
-                RequestRebirth:InvokeServer()
-                rebirthCount += 1
-                RebirthLabel.Text = "Rebirths: " .. rebirthCount
+                if RequestRebirth then
+                    RequestRebirth:InvokeServer()
+                    rebirthCount += 1
+                    RebirthLabel.Text = "Rebirths: " .. rebirthCount
+                end
                 if multiplierOn then
                     threshold = threshold * multiplier
                     ThreshBox.Text = formatThresh(threshold)
@@ -1813,15 +1804,7 @@ task.spawn(function()
     end
 end)
 
--- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
-game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
-    if state == Enum.TeleportState.RequestedFromServer then
-        warn("[AutoHub] Server teleport detected")
-        task.wait(3)
-        pcall(function() TeleportService:Teleport(placeId, player) end)
-    end
-end)
-
+-- ─── Disconnect Detection ────────────────────────────────────────────────────
 game:GetService("Players").LocalPlayer.Idled:Connect(function(time)
     warn("[AutoHub] Player idle detected - " .. tostring(time) .. "s idle")
 end)
