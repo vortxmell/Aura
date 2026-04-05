@@ -1,4 +1,4 @@
--- Auto Hub v3 - Tab Edition
+-- Auto Hub v3 - Tab Edition (FIXED)
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -155,6 +155,7 @@ MinBtn.Text = "—"
 MinBtn.TextColor3 = WHITE
 MinBtn.TextSize = 10
 MinBtn.Font = Enum.Font.GothamBold
+MinBtn.ZIndex = 5  -- FIX: tinggi ZIndex supaya terima click dulu
 MinBtn.Parent = TitleBar
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
 
@@ -167,13 +168,16 @@ CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = WHITE
 CloseBtn.TextSize = 10
 CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.ZIndex = 5  -- FIX: tinggi ZIndex supaya terima click dulu
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
--- Drag
+-- FIX: Drag logic - check kalau click kat button area (60px dari kanan), skip drag
 local dragging, dragStart, startPos
 TitleBar.InputBegan:Connect(function(i)
     if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        local relX = i.Position.X - Main.AbsolutePosition.X
+        if relX > (Main.AbsoluteSize.X - 60) then return end  -- skip kalau kat button area
         dragging = true; dragStart = i.Position; startPos = Main.Position
     end
 end)
@@ -570,7 +574,6 @@ configStatus.Parent = PanelConfig
 yC = yC + 18
 PanelConfig.CanvasSize = UDim2.new(0,0,0,yC+4)
 
-
 local function fmtA(n)
     if not n or n <= 0 then return "0" end
     for _, s in ipairs(suffixes) do
@@ -770,7 +773,7 @@ local function updateKOTHPanel()
     end
 end
 
--- --- Resize Main ---
+-- --- Resize Main ---  FIX: buang yA yang tak wujud
 contentH = math.max(yF, yC, yK) + 4
 fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
@@ -1055,7 +1058,7 @@ local function rebuildConfigList()
         item.TextXAlignment = Enum.TextXAlignment.Left; item.Parent = configList
         Instance.new("UICorner", item).CornerRadius = UDim.new(0,4)
         item.MouseButton1Click:Connect(function() selectedCfg = name; rebuildConfigList() end)
-        end -- close if name ~= AUTOLOAD_KEY
+        end
     end
     if not hasAny then
         local empty = Instance.new("TextLabel")
@@ -1288,11 +1291,9 @@ task.spawn(function()
 end)
 
 -- --- Server Hop Function ---
-
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
     kothHopping = true
-    -- Save KOTH state before hopping so it restores on re-execute
     autoSave()
     kAutoStatus.Text = "🔄 Hopping... (" .. (reason or "?") .. ")"
     kAutoStatus.TextColor3 = WARN
@@ -1355,7 +1356,6 @@ task.spawn(function()
     local wasHolding = false
 
     while ScreenGui.Parent do
-        -- Force Hop (independent dari autoKOTH)
         if forceHop then
             forceHop = false
             hopToLeastPopulated("Force")
@@ -1369,7 +1369,6 @@ task.spawn(function()
 
             if inKOTH then
                 if claimed and kingAura > myAura then
-                    -- Ada player masuk aura lebih tinggi, hop sebelum mati
                     wasHolding = false
                     kAutoStatus.Text = "⚠️ Threat! Hopping..."
                     kAutoStatus.TextColor3 = RED
@@ -1381,7 +1380,6 @@ task.spawn(function()
                 end
             else
                 if wasHolding then
-                    -- Pernah holding tapi dah keluar = kena kill
                     if claimed and kingAura > myAura then
                         wasHolding = false
                         kAutoStatus.Text = "💀 Killed! Hopping..."
