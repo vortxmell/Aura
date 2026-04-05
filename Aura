@@ -227,9 +227,9 @@ local function makeTabBtn(icon, posY)
 end
 
 local TabFarm     = makeTabBtn("⚡", 8)
-local TabConfig   = makeTabBtn("💾", 50)
-local TabAnalyzer = makeTabBtn("📊", 92)
-local TabKOTH     = makeTabBtn("👑", 134)
+local TabKOTH     = makeTabBtn("👑", 50)
+local TabConfig   = makeTabBtn("💾", 92)
+local TabAnalyzer = makeTabBtn("📊", 134)
 
 local TabIndicator = Instance.new("Frame")
 TabIndicator.Size = UDim2.new(0, 3, 0, 24)
@@ -740,6 +740,23 @@ local function getKOTHStatus()
     return false, "—", 0
 end
 
+-- ─── KOTH Helper Functions ───────────────────────────────────────────────────
+local function isInKOTH()
+    if not kothHitbox then return false end
+    local c = player.Character
+    if not c then return false end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local ok2, parts = pcall(function()
+        return workspace:GetPartsInPart(kothHitbox)
+    end)
+    if not ok2 or not parts then return false end
+    for _, part in ipairs(parts) do
+        if part:IsDescendantOf(c) then return true end
+    end
+    return false
+end
+
 local function updateKOTHPanel()
     local myAura = getAura()
     local claimed, kingName, kingAura = getKOTHStatus()
@@ -748,7 +765,17 @@ local function updateKOTHPanel()
     local myRebirths = player:GetAttribute("Rebirths") or 0
     kRowMyRank.Text = fmtA(myRebirths) .. " reb"
 
-    if not claimed then
+    if isInKOTH() then
+        kStatusDot.BackgroundColor3 = PURPLE
+        kRowStatus.Text = "👑 Holding KOTH!"
+        kRowStatus.TextColor3 = PURPLE
+        kRowKing.Text = "— (You)"
+        kRowKing.TextColor3 = WHITE
+        kRowKingAura.Text = fmtA(myAura)
+        kRowKingAura.TextColor3 = WHITE
+        kRowResult.Text = "You are King!"
+        kRowResult.TextColor3 = GREEN
+    elseif not claimed then
         kStatusDot.BackgroundColor3 = GREEN
         kRowStatus.Text = "EMPTY ✓"
         kRowStatus.TextColor3 = GREEN
@@ -798,7 +825,7 @@ local function switchTab(tab)
     TweenService:Create(TabAnalyzer, tweenInfo, {BackgroundTransparency = tab=="analyzer" and 0.6 or 1}):Play()
     TweenService:Create(TabKOTH,     tweenInfo, {BackgroundTransparency = tab=="koth"     and 0.6 or 1}):Play()
 
-    local indicatorY = tab=="farm" and 13 or tab=="config" and 55 or tab=="analyzer" and 97 or 139
+    local indicatorY = tab=="farm" and 13 or tab=="koth" and 55 or tab=="config" and 97 or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0,indicatorY)}):Play()
 
     -- Update KOTH panel terus bila switch ke tab tu
@@ -1286,30 +1313,13 @@ task.spawn(function()
 end)
 
 -- ─── NEW: Auto KOTH Loop ──────────────────────────────────────────────────────
-local function isInKOTH()
-    if not kothHitbox then return false end
-    local c = player.Character
-    if not c then return false end
-    local hrp = c:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local ok2, parts = pcall(function()
-        return workspace:GetPartsInPart(kothHitbox)
-    end)
-    if not ok2 or not parts then return false end
-    for _, part in ipairs(parts) do
-        if part:IsDescendantOf(c) then return true end
-    end
-    return false
-end
-
 task.spawn(function()
     local KOTH_POS = Vector3.new(-115, 28, 115)
     while ScreenGui.Parent do
         if autoKOTH then
-            -- Check dulu kita sendiri ada dalam KOTH ke tak
             if isInKOTH() then
                 kAutoStatus.Text = "👑 Holding KOTH!"
-                kAutoStatus.TextColor3 = GREEN
+                kAutoStatus.TextColor3 = PURPLE
             else
                 local myAura = getAura()
                 local claimed, kingName, kingAura = getKOTHStatus()
