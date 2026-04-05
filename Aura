@@ -124,7 +124,7 @@ Main.Active = true
 Main.Draggable = false
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
-local MainStroke = Instance.new("UIStroke", Main)
+MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = Color3.fromRGB(80, 60, 120)
 MainStroke.Thickness = 1
 
@@ -189,7 +189,7 @@ TitleBar.InputEnded:Connect(function(i)
     end
 end)
 
-local TitleDiv = Instance.new("Frame")
+TitleDiv = Instance.new("Frame")
 TitleDiv.Size = UDim2.new(1, 0, 0, 1)
 TitleDiv.Position = UDim2.new(0, 0, 0, 36)
 TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
@@ -492,7 +492,7 @@ local function makeCLabel(text, y, color, size)
 end
 
 makeCLabel("S  CONFIGURATION", yC, WHITE, 10); yC = yC + 18
-local cd1 = Instance.new("Frame")
+cd1 = Instance.new("Frame")
 cd1.Size = UDim2.new(0.9,0,0,1); cd1.Position = UDim2.new(0.05,0,0,yC)
 cd1.BackgroundColor3 = Color3.fromRGB(60,45,90); cd1.BorderSizePixel=0; cd1.Parent=PanelConfig
 yC = yC + 6
@@ -506,7 +506,7 @@ configNameBox.Text = ""; configNameBox.TextColor3 = WHITE; configNameBox.TextSiz
 configNameBox.Font = Enum.Font.Gotham; configNameBox.ClearTextOnFocus = false
 configNameBox.Parent = PanelConfig
 Instance.new("UICorner", configNameBox).CornerRadius = UDim.new(0,6)
-local cns = Instance.new("UIStroke", configNameBox)
+cns = Instance.new("UIStroke", configNameBox)
 cns.Color = Color3.fromRGB(80,60,120); cns.Thickness = 1
 yC = yC + 28
 
@@ -518,7 +518,7 @@ btnSave.Font = Enum.Font.GothamBold; btnSave.Parent = PanelConfig
 Instance.new("UICorner", btnSave).CornerRadius = UDim.new(0,6)
 yC = yC + 30
 
-local cd2 = Instance.new("Frame")
+cd2 = Instance.new("Frame")
 cd2.Size = UDim2.new(0.9,0,0,1); cd2.Position = UDim2.new(0.05,0,0,yC)
 cd2.BackgroundColor3 = Color3.fromRGB(60,45,90); cd2.BorderSizePixel=0; cd2.Parent=PanelConfig
 yC = yC + 6
@@ -532,9 +532,9 @@ configList.ScrollBarImageColor3 = PURPLE; configList.CanvasSize = UDim2.new(0,0,
 configList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 configList.ScrollingDirection = Enum.ScrollingDirection.Y; configList.Parent = PanelConfig
 Instance.new("UICorner", configList).CornerRadius = UDim.new(0,6)
-local cls = Instance.new("UIStroke", configList)
+cls = Instance.new("UIStroke", configList)
 cls.Color = Color3.fromRGB(60,45,90); cls.Thickness = 1
-local configListLayout = Instance.new("UIListLayout", configList)
+configListLayout = Instance.new("UIListLayout", configList)
 configListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 configListLayout.Padding = UDim.new(0,2)
 yC = yC + 106
@@ -620,7 +620,7 @@ local aRowRebirths = makeARow("Rebirths:")
 local aRowReq      = makeARow("Area Req:")
 local aRowPeak     = makeARow("Peak Aura:")
 
-local aDivFrame = Instance.new("Frame")
+aDivFrame = Instance.new("Frame")
 aDivFrame.Size = UDim2.new(0.9,0,0,1); aDivFrame.Position = UDim2.new(0.05,0,0,yA)
 aDivFrame.BackgroundColor3 = Color3.fromRGB(60,45,90); aDivFrame.BorderSizePixel = 0
 aDivFrame.Parent = PanelAnalyzer
@@ -705,7 +705,7 @@ kAutoRow.BackgroundColor3 = PANEL; kAutoRow.BorderSizePixel = 0; kAutoRow.Parent
 Instance.new("UICorner", kAutoRow).CornerRadius = UDim.new(0,6)
 local kAutoStroke = Instance.new("UIStroke", kAutoRow)
 kAutoStroke.Color = Color3.fromRGB(60,45,90); kAutoStroke.Thickness = 1
-local kAutoLabel = Instance.new("TextLabel")
+kAutoLabel = Instance.new("TextLabel")
 kAutoLabel.Size = UDim2.new(1,-50,1,0); kAutoLabel.Position = UDim2.new(0,8,0,0)
 kAutoLabel.BackgroundTransparency = 1; kAutoLabel.Text = "Auto Enter KOTH"
 kAutoLabel.TextColor3 = WHITE; kAutoLabel.TextSize = 10; kAutoLabel.Font = Enum.Font.GothamBold
@@ -832,8 +832,8 @@ local function updateKOTHPanel()
 end
 
 -- --- Resize Main ---
-local contentH = math.max(yF, yC, yA, yK) + 4
-local fullH = math.min(PAD_TOP + contentH, MAX_H)
+contentH = math.max(yF, yC, yA, yK) + 4
+fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
@@ -870,9 +870,9 @@ TabKOTH.MouseButton1Click:Connect(function()     switchTab("koth")     end)
 switchTab("farm")
 
 -- --- Popup ---
-local POPUP_W = 200
-local POPUP_ITEM_H = 20
-local POPUP_H = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
+POPUP_W = 200
+POPUP_ITEM_H = 20
+POPUP_H = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
 
 local Backdrop = Instance.new("TextButton")
 Backdrop.Size = UDim2.new(1,0,1,0); Backdrop.BackgroundColor3 = Color3.fromRGB(0,0,0)
@@ -884,23 +884,23 @@ Popup.Size = UDim2.new(0,POPUP_W,0,POPUP_H); Popup.Position = UDim2.new(0.5,-POP
 Popup.BackgroundColor3 = Color3.fromRGB(15,12,22); Popup.BorderSizePixel = 0
 Popup.ZIndex = 11; Popup.Visible = false; Popup.Parent = ScreenGui
 Instance.new("UICorner", Popup).CornerRadius = UDim.new(0,12)
-local PopupStroke = Instance.new("UIStroke", Popup)
+PopupStroke = Instance.new("UIStroke", Popup)
 PopupStroke.Color = Color3.fromRGB(80,60,120); PopupStroke.Thickness = 1
 
-local PopupTitle = Instance.new("TextLabel")
+PopupTitle = Instance.new("TextLabel")
 PopupTitle.Size = UDim2.new(1,-20,0,28); PopupTitle.Position = UDim2.new(0,10,0,4)
 PopupTitle.BackgroundTransparency = 1; PopupTitle.Text = "Select Rebirth Target"
 PopupTitle.TextColor3 = WHITE; PopupTitle.TextSize = 11; PopupTitle.Font = Enum.Font.GothamBold
 PopupTitle.TextXAlignment = Enum.TextXAlignment.Left; PopupTitle.ZIndex = 12; PopupTitle.Parent = Popup
 
-local PopupDiv = Instance.new("Frame")
+PopupDiv = Instance.new("Frame")
 PopupDiv.Size = UDim2.new(0.9,0,0,1); PopupDiv.Position = UDim2.new(0.05,0,0,30)
 PopupDiv.BackgroundColor3 = Color3.fromRGB(60,45,90); PopupDiv.BorderSizePixel = 0
 PopupDiv.ZIndex = 12; PopupDiv.Parent = Popup
 
 local popupItems = {}
 local selectedInPopup = nil
-local listStartY = 36
+listStartY = 36
 
 for i, area in ipairs(areas) do
     local itemY = listStartY + (i-1) * (POPUP_ITEM_H + 2)
@@ -934,8 +934,8 @@ for i, area in ipairs(areas) do
     popupItems[i] = {frame=Item, dot=ItemDot, nameLbl=NameLbl, reqLbl=ReqLbl, checkLbl=CheckLbl, hitbox=Hitbox, area=area}
 end
 
-local bottomY = listStartY + (#areas * (POPUP_ITEM_H + 2)) + 4
-local btnY = bottomY + 4
+bottomY = listStartY + (#areas * (POPUP_ITEM_H + 2)) + 4
+btnY = bottomY + 4
 
 local CancelBtn = Instance.new("TextButton")
 CancelBtn.Size = UDim2.new(0.44,0,0,22); CancelBtn.Position = UDim2.new(0.04,0,0,btnY)
