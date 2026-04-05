@@ -2,6 +2,9 @@
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local placeId = game.PlaceId
 local RequestRebirth = nil
 task.spawn(function()
     local ok2, result = pcall(function()
@@ -1341,8 +1344,6 @@ task.spawn(function()
 end)
 
 -- ─── Server Hop Function ──────────────────────────────────────────────────────
-local TeleportService = game:GetService("TeleportService")
-local placeId = game.PlaceId
 
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
@@ -1363,7 +1364,7 @@ local function hopToLeastPopulated(reason)
             )
             if cursor ~= "" then url = url .. "&cursor=" .. cursor end
 
-            local ok2, result = pcall(function() return game:HttpGet(url) end)
+            local ok2, result = pcall(function() return (typeof(request)=="function" and request({Url=url,Method="GET"}).Body) or game:HttpGet(url) end)
             if not ok2 then break end
 
             local ok3, data = pcall(function()
