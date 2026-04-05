@@ -33,6 +33,16 @@ local threshold      = 2
 local multiplier     = 2
 local comboTarget    = nil
 
+-- ─── KOTH Variables ──────────────────────────────────────────────────────────
+local autoKOTH       = false
+local isInKOTH       = false
+local isHopping      = false
+local kothHopCount   = 0
+local kothPos        = Vector3.new(-118, 32, 121)
+local kothKingName   = "—"
+local kothKingAura   = 0
+local kothClaimed    = false
+
 local suffixes = {
     {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
     {1e33,"Dc"},{1e30,"No"},{1e27,"Oc"},{1e24,"Sp"},
@@ -87,6 +97,7 @@ local GREEN   = Color3.fromRGB(80, 200, 120)
 local RED     = Color3.fromRGB(220, 80, 80)
 local DARK    = Color3.fromRGB(10, 10, 14)
 local PANEL   = Color3.fromRGB(18, 16, 26)
+local GOLD    = Color3.fromRGB(255, 200, 60)
 
 -- ─── ScreenGui ───────────────────────────────────────────────────────────────
 local ScreenGui = Instance.new("ScreenGui")
@@ -192,7 +203,6 @@ TabBar.Parent = Main
 local TabBarCorner = Instance.new("UICorner", TabBar)
 TabBarCorner.CornerRadius = UDim.new(0, 10)
 
--- Vertical divider between tab bar and content
 local TabDiv = Instance.new("Frame")
 TabDiv.Size = UDim2.new(0, 1, 1, -PAD_TOP)
 TabDiv.Position = UDim2.new(0, TAB_W, 0, PAD_TOP)
@@ -200,7 +210,7 @@ TabDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TabDiv.BorderSizePixel = 0
 TabDiv.Parent = Main
 
--- ─── Content Area (kanan) ────────────────────────────────────────────────────
+-- ─── Content Area ────────────────────────────────────────────────────────────
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -(TAB_W+1), 1, -PAD_TOP)
 ContentArea.Position = UDim2.new(0, TAB_W+1, 0, PAD_TOP)
@@ -209,7 +219,7 @@ ContentArea.BorderSizePixel = 0
 ContentArea.ClipsDescendants = true
 ContentArea.Parent = Main
 
--- ─── Helper: make tab button ─────────────────────────────────────────────────
+-- ─── Tab Buttons ─────────────────────────────────────────────────────────────
 local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
 
 local function makeTabBtn(icon, posY)
@@ -228,9 +238,10 @@ local function makeTabBtn(icon, posY)
     return btn
 end
 
-local TabFarm   = makeTabBtn("⚡", 8)
-local TabConfig = makeTabBtn("💾", 50)
-local TabAnalyzer = makeTabBtn("📊", 92)
+local TabFarm     = makeTabBtn("⚡", 8)
+local TabConfig   = makeTabBtn("💾", 50)
+local TabKOTH     = makeTabBtn("👑", 92)   -- KOTH tab (sebelum Analyzer)
+local TabAnalyzer = makeTabBtn("📊", 134)  -- Analyzer turun ke bawah
 
 -- Active indicator bar
 local TabIndicator = Instance.new("Frame")
@@ -241,7 +252,7 @@ TabIndicator.BorderSizePixel = 0
 TabIndicator.Parent = TabBar
 Instance.new("UICorner", TabIndicator).CornerRadius = UDim.new(0, 4)
 
--- ─── Scrolling panels ────────────────────────────────────────────────────────
+-- ─── Scrolling Panels ────────────────────────────────────────────────────────
 local function makeScrollPanel()
     local s = Instance.new("ScrollingFrame")
     s.Size = UDim2.new(1, 0, 1, 0)
@@ -256,15 +267,14 @@ local function makeScrollPanel()
     return s
 end
 
-local PanelFarm   = makeScrollPanel()
-local PanelConfig = makeScrollPanel()
-PanelConfig.Visible = false
-local PanelAnalyzer = makeScrollPanel()
-PanelAnalyzer.Visible = false
+local PanelFarm     = makeScrollPanel()
+local PanelConfig   = makeScrollPanel(); PanelConfig.Visible   = false
+local PanelKOTH     = makeScrollPanel(); PanelKOTH.Visible     = false
+local PanelAnalyzer = makeScrollPanel(); PanelAnalyzer.Visible = false
 
--- ─── Row builder helpers (target panel = PanelFarm) ──────────────────────────
+-- ─── Row builder helpers (Farm Panel) ────────────────────────────────────────
 local PAD_X = 10
-local yF = GAP  -- y cursor for farm panel
+local yF = GAP
 
 local function nextYF(h) local c=yF; yF=yF+h+GAP; return c end
 
@@ -352,7 +362,6 @@ local function makeToggleRow(labelText)
     return Hitbox, Pill, Dot, BtnStroke
 end
 
--- Threshold row - TextBox boleh type
 local function makeThresholdRow(labelText, defaultVal)
     local rowY = nextYF(ROW_H)
     local TFrame = Instance.new("Frame")
@@ -386,7 +395,6 @@ local function makeThresholdRow(labelText, defaultVal)
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
     Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
-    -- TextBox boleh type
     local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 38, 0, 14)
     InputBox.Position = UDim2.new(1, -58, 0.5, -7)
@@ -561,7 +569,6 @@ makeDivider()
 makeSection("UTILITY")
 local ZoneBtn, ZonePill, ZoneDot, ZoneStroke = makeToggleRow("Zone Guard")
 
--- Set farm panel canvas
 PanelFarm.CanvasSize = UDim2.new(0, 0, 0, yF + 4)
 
 -- ─── Build Config Panel ──────────────────────────────────────────────────────
@@ -581,20 +588,12 @@ local function makeCLabel(text, y, color, size)
     return l
 end
 
--- Title
 makeCLabel("💾  CONFIGURATION", yC, WHITE, 10)
 yC = yC + 18
-
--- Divider
 local cd1 = Instance.new("Frame")
-cd1.Size = UDim2.new(0.9, 0, 0, 1)
-cd1.Position = UDim2.new(0.05, 0, 0, yC)
-cd1.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
-cd1.BorderSizePixel = 0
-cd1.Parent = PanelConfig
+cd1.Size = UDim2.new(0.9, 0, 0, 1); cd1.Position = UDim2.new(0.05, 0, 0, yC)
+cd1.BackgroundColor3 = Color3.fromRGB(60, 45, 90); cd1.BorderSizePixel = 0; cd1.Parent = PanelConfig
 yC = yC + 6
-
--- Name input
 makeCLabel("Config name:", yC, DIM, 8)
 yC = yC + 14
 
@@ -616,45 +615,28 @@ local cns = Instance.new("UIStroke", configNameBox)
 cns.Color = Color3.fromRGB(80, 60, 120); cns.Thickness = 1
 yC = yC + 28
 
--- Save button
 local btnSave = Instance.new("TextButton")
-btnSave.Size = UDim2.new(1, -16, 0, 24)
-btnSave.Position = UDim2.new(0, 8, 0, yC)
-btnSave.BackgroundColor3 = Color3.fromRGB(40, 130, 70)
-btnSave.BorderSizePixel = 0
-btnSave.Text = "💾  Save Config"
-btnSave.TextColor3 = WHITE
-btnSave.TextSize = 10
-btnSave.Font = Enum.Font.GothamBold
-btnSave.Parent = PanelConfig
+btnSave.Size = UDim2.new(1, -16, 0, 24); btnSave.Position = UDim2.new(0, 8, 0, yC)
+btnSave.BackgroundColor3 = Color3.fromRGB(40, 130, 70); btnSave.BorderSizePixel = 0
+btnSave.Text = "💾  Save Config"; btnSave.TextColor3 = WHITE; btnSave.TextSize = 10
+btnSave.Font = Enum.Font.GothamBold; btnSave.Parent = PanelConfig
 Instance.new("UICorner", btnSave).CornerRadius = UDim.new(0, 6)
 yC = yC + 30
 
--- Divider
 local cd2 = Instance.new("Frame")
-cd2.Size = UDim2.new(0.9, 0, 0, 1)
-cd2.Position = UDim2.new(0.05, 0, 0, yC)
-cd2.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
-cd2.BorderSizePixel = 0
-cd2.Parent = PanelConfig
+cd2.Size = UDim2.new(0.9, 0, 0, 1); cd2.Position = UDim2.new(0.05, 0, 0, yC)
+cd2.BackgroundColor3 = Color3.fromRGB(60, 45, 90); cd2.BorderSizePixel = 0; cd2.Parent = PanelConfig
 yC = yC + 6
-
 makeCLabel("Saved configs:", yC, DIM, 8)
 yC = yC + 14
 
--- Config list (scrollable)
 local configList = Instance.new("ScrollingFrame")
-configList.Size = UDim2.new(1, -16, 0, 100)
-configList.Position = UDim2.new(0, 8, 0, yC)
-configList.BackgroundColor3 = Color3.fromRGB(14, 12, 20)
-configList.BackgroundTransparency = 0.3
-configList.BorderSizePixel = 0
-configList.ScrollBarThickness = 2
-configList.ScrollBarImageColor3 = PURPLE
-configList.CanvasSize = UDim2.new(0, 0, 0, 0)
+configList.Size = UDim2.new(1, -16, 0, 100); configList.Position = UDim2.new(0, 8, 0, yC)
+configList.BackgroundColor3 = Color3.fromRGB(14, 12, 20); configList.BackgroundTransparency = 0.3
+configList.BorderSizePixel = 0; configList.ScrollBarThickness = 2
+configList.ScrollBarImageColor3 = PURPLE; configList.CanvasSize = UDim2.new(0, 0, 0, 0)
 configList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-configList.ScrollingDirection = Enum.ScrollingDirection.Y
-configList.Parent = PanelConfig
+configList.ScrollingDirection = Enum.ScrollingDirection.Y; configList.Parent = PanelConfig
 Instance.new("UICorner", configList).CornerRadius = UDim.new(0, 6)
 local cls = Instance.new("UIStroke", configList)
 cls.Color = Color3.fromRGB(60, 45, 90); cls.Thickness = 1
@@ -663,60 +645,166 @@ configListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 configListLayout.Padding = UDim.new(0, 2)
 yC = yC + 106
 
--- Load / Delete buttons
 local btnLoad = Instance.new("TextButton")
-btnLoad.Size = UDim2.new(0.5, -10, 0, 24)
-btnLoad.Position = UDim2.new(0, 8, 0, yC)
-btnLoad.BackgroundColor3 = Color3.fromRGB(30, 80, 160)
-btnLoad.BorderSizePixel = 0
-btnLoad.Text = "📂  Load"
-btnLoad.TextColor3 = WHITE
-btnLoad.TextSize = 10
-btnLoad.Font = Enum.Font.GothamBold
-btnLoad.Parent = PanelConfig
+btnLoad.Size = UDim2.new(0.5, -10, 0, 24); btnLoad.Position = UDim2.new(0, 8, 0, yC)
+btnLoad.BackgroundColor3 = Color3.fromRGB(30, 80, 160); btnLoad.BorderSizePixel = 0
+btnLoad.Text = "📂  Load"; btnLoad.TextColor3 = WHITE; btnLoad.TextSize = 10
+btnLoad.Font = Enum.Font.GothamBold; btnLoad.Parent = PanelConfig
 Instance.new("UICorner", btnLoad).CornerRadius = UDim.new(0, 6)
 
 local btnDelete = Instance.new("TextButton")
-btnDelete.Size = UDim2.new(0.5, -10, 0, 24)
-btnDelete.Position = UDim2.new(0.5, 2, 0, yC)
-btnDelete.BackgroundColor3 = Color3.fromRGB(140, 30, 40)
-btnDelete.BorderSizePixel = 0
-btnDelete.Text = "🗑  Delete"
-btnDelete.TextColor3 = WHITE
-btnDelete.TextSize = 10
-btnDelete.Font = Enum.Font.GothamBold
-btnDelete.Parent = PanelConfig
+btnDelete.Size = UDim2.new(0.5, -10, 0, 24); btnDelete.Position = UDim2.new(0.5, 2, 0, yC)
+btnDelete.BackgroundColor3 = Color3.fromRGB(140, 30, 40); btnDelete.BorderSizePixel = 0
+btnDelete.Text = "🗑  Delete"; btnDelete.TextColor3 = WHITE; btnDelete.TextSize = 10
+btnDelete.Font = Enum.Font.GothamBold; btnDelete.Parent = PanelConfig
 Instance.new("UICorner", btnDelete).CornerRadius = UDim.new(0, 6)
 yC = yC + 30
 
--- Auto load button
 local btnAutoLoad = Instance.new("TextButton")
-btnAutoLoad.Size = UDim2.new(1, -16, 0, 24)
-btnAutoLoad.Position = UDim2.new(0, 8, 0, yC)
-btnAutoLoad.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
-btnAutoLoad.BorderSizePixel = 0
-btnAutoLoad.Text = "⚡  Set Auto Load: None"
-btnAutoLoad.TextColor3 = Color3.fromRGB(255, 210, 80)
-btnAutoLoad.TextSize = 10
-btnAutoLoad.Font = Enum.Font.GothamBold
-btnAutoLoad.Parent = PanelConfig
+btnAutoLoad.Size = UDim2.new(1, -16, 0, 24); btnAutoLoad.Position = UDim2.new(0, 8, 0, yC)
+btnAutoLoad.BackgroundColor3 = Color3.fromRGB(60, 40, 10); btnAutoLoad.BorderSizePixel = 0
+btnAutoLoad.Text = "⚡  Set Auto Load: None"; btnAutoLoad.TextColor3 = Color3.fromRGB(255, 210, 80)
+btnAutoLoad.TextSize = 10; btnAutoLoad.Font = Enum.Font.GothamBold; btnAutoLoad.Parent = PanelConfig
 Instance.new("UICorner", btnAutoLoad).CornerRadius = UDim.new(0, 6)
 yC = yC + 30
 
--- Status label
 local configStatus = Instance.new("TextLabel")
-configStatus.Size = UDim2.new(1, -16, 0, 14)
-configStatus.Position = UDim2.new(0, 8, 0, yC)
-configStatus.BackgroundTransparency = 1
-configStatus.Text = ""
-configStatus.TextColor3 = GREEN
-configStatus.TextSize = 9
-configStatus.Font = Enum.Font.Gotham
-configStatus.TextXAlignment = Enum.TextXAlignment.Center
+configStatus.Size = UDim2.new(1, -16, 0, 14); configStatus.Position = UDim2.new(0, 8, 0, yC)
+configStatus.BackgroundTransparency = 1; configStatus.Text = ""
+configStatus.TextColor3 = GREEN; configStatus.TextSize = 9
+configStatus.Font = Enum.Font.Gotham; configStatus.TextXAlignment = Enum.TextXAlignment.Center
 configStatus.Parent = PanelConfig
 yC = yC + 18
 
 PanelConfig.CanvasSize = UDim2.new(0, 0, 0, yC + 4)
+
+-- ─── Build KOTH Panel ────────────────────────────────────────────────────────
+local yK = GAP
+
+local function makeKRow(labelText, panel, yRef, color)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -10, 0, 18)
+    bg.Position = UDim2.new(0, 5, 0, yRef[1])
+    bg.BackgroundTransparency = 1
+    bg.Parent = panel
+    yRef[1] = yRef[1] + 20
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.5, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = Color3.fromRGB(150, 140, 180)
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = bg
+
+    local val = Instance.new("TextLabel")
+    val.Size = UDim2.new(0.5, 0, 1, 0)
+    val.Position = UDim2.new(0.5, 0, 0, 0)
+    val.BackgroundTransparency = 1
+    val.Text = "—"
+    val.TextColor3 = color or WHITE
+    val.TextSize = 9
+    val.Font = Enum.Font.Gotham
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.Parent = bg
+    return val
+end
+
+local function makeKToggleRow(labelText, panel, yRef)
+    local rowY = yRef[1]
+    yRef[1] = yRef[1] + ROW_H + GAP
+    local Btn = Instance.new("Frame")
+    Btn.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
+    Btn.Position = UDim2.new(0, PAD_X, 0, rowY)
+    Btn.BackgroundColor3 = PANEL
+    Btn.BorderSizePixel = 0
+    Btn.Parent = panel
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    local BtnStroke = Instance.new("UIStroke", Btn)
+    BtnStroke.Color = Color3.fromRGB(60, 45, 90); BtnStroke.Thickness = 1
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -50, 1, 0); Label.Position = UDim2.new(0, 8, 0, 0)
+    Label.BackgroundTransparency = 1; Label.Text = labelText
+    Label.TextColor3 = WHITE; Label.TextSize = 10
+    Label.Font = Enum.Font.GothamBold
+    Label.TextXAlignment = Enum.TextXAlignment.Left; Label.Parent = Btn
+    local Pill = Instance.new("Frame")
+    Pill.Size = UDim2.new(0, 28, 0, 14); Pill.Position = UDim2.new(1, -36, 0.5, -7)
+    Pill.BackgroundColor3 = Color3.fromRGB(40, 35, 55); Pill.BorderSizePixel = 0; Pill.Parent = Btn
+    Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
+    local Dot = Instance.new("Frame")
+    Dot.Size = UDim2.new(0, 10, 0, 10); Dot.Position = UDim2.new(0, 2, 0.5, -5)
+    Dot.BackgroundColor3 = Color3.fromRGB(100, 90, 130); Dot.BorderSizePixel = 0; Dot.Parent = Pill
+    Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+    local Hitbox = Instance.new("TextButton")
+    Hitbox.Size = UDim2.new(1, 0, 1, 0); Hitbox.BackgroundTransparency = 1
+    Hitbox.Text = ""; Hitbox.Parent = Btn
+    return Hitbox, Pill, Dot, BtnStroke
+end
+
+local kRef = {yK}
+
+-- Title
+local kTitle = Instance.new("TextLabel")
+kTitle.Size = UDim2.new(1, -16, 0, 14)
+kTitle.Position = UDim2.new(0, 8, 0, kRef[1])
+kTitle.BackgroundTransparency = 1
+kTitle.Text = "👑  KING OF THE HILL"
+kTitle.TextColor3 = GOLD
+kTitle.TextSize = 10
+kTitle.Font = Enum.Font.GothamBold
+kTitle.TextXAlignment = Enum.TextXAlignment.Left
+kTitle.Parent = PanelKOTH
+kRef[1] = kRef[1] + 18
+
+-- Divider
+local kd1 = Instance.new("Frame")
+kd1.Size = UDim2.new(0.9, 0, 0, 1); kd1.Position = UDim2.new(0.05, 0, 0, kRef[1])
+kd1.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd1.BorderSizePixel = 0; kd1.Parent = PanelKOTH
+kRef[1] = kRef[1] + 6
+
+-- Toggle
+local KOTHBtn, KOTHPill, KOTHDot, KOTHStroke = makeKToggleRow("Auto KOTH", PanelKOTH, kRef)
+
+-- Divider
+local kd2 = Instance.new("Frame")
+kd2.Size = UDim2.new(0.9, 0, 0, 1); kd2.Position = UDim2.new(0.05, 0, 0, kRef[1])
+kd2.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd2.BorderSizePixel = 0; kd2.Parent = PanelKOTH
+kRef[1] = kRef[1] + 6
+
+-- Status rows
+local kRowStatus = makeKRow("KOTH Status:", PanelKOTH, kRef, Color3.fromRGB(100, 220, 255))
+local kRowKing   = makeKRow("King:", PanelKOTH, kRef, GOLD)
+local kRowKingA  = makeKRow("King Aura:", PanelKOTH, kRef, Color3.fromRGB(255, 150, 80))
+local kRowMyA    = makeKRow("Your Aura:", PanelKOTH, kRef, GREEN)
+local kRowResult = makeKRow("Result:", PanelKOTH, kRef, WHITE)
+
+-- Divider
+local kd3 = Instance.new("Frame")
+kd3.Size = UDim2.new(0.9, 0, 0, 1); kd3.Position = UDim2.new(0.05, 0, 0, kRef[1])
+kd3.BackgroundColor3 = Color3.fromRGB(60, 45, 90); kd3.BorderSizePixel = 0; kd3.Parent = PanelKOTH
+kRef[1] = kRef[1] + 6
+
+local kRowHops = makeKRow("Server Hops:", PanelKOTH, kRef, DIM)
+
+-- Force Hop button
+kRef[1] = kRef[1] + 4
+local kHopBtn = Instance.new("TextButton")
+kHopBtn.Size = UDim2.new(1, -16, 0, 26)
+kHopBtn.Position = UDim2.new(0, 8, 0, kRef[1])
+kHopBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 120)
+kHopBtn.BorderSizePixel = 0
+kHopBtn.Text = "🔀 Force Hop"
+kHopBtn.TextColor3 = WHITE
+kHopBtn.TextSize = 11
+kHopBtn.Font = Enum.Font.GothamBold
+kHopBtn.Parent = PanelKOTH
+Instance.new("UICorner", kHopBtn).CornerRadius = UDim.new(0, 6)
+kRef[1] = kRef[1] + 32
+
+PanelKOTH.CanvasSize = UDim2.new(0, 0, 0, kRef[1] + 4)
 
 -- ─── Build Analyzer Panel ────────────────────────────────────────────────────
 local SAMPLE_A = 10
@@ -745,7 +833,6 @@ local function makeARow(labelText, color, isGreen)
     bg.BackgroundTransparency = 1
     bg.Parent = PanelAnalyzer
     yA = yA + 21
-
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(0.52, 0, 1, 0)
     lbl.BackgroundTransparency = 1
@@ -755,7 +842,6 @@ local function makeARow(labelText, color, isGreen)
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = bg
-
     local val = Instance.new("TextLabel")
     val.Size = UDim2.new(0.48, 0, 1, 0)
     val.Position = UDim2.new(0.52, 0, 0, 0)
@@ -769,7 +855,6 @@ local function makeARow(labelText, color, isGreen)
     return val
 end
 
--- Rows
 local aRowArea     = makeARow("Area:")
 local aRowSec      = makeARow("Aura/sec:")
 local aRowHour     = makeARow("Aura/hour:")
@@ -779,7 +864,6 @@ local aRowRebirths = makeARow("Rebirths:")
 local aRowReq      = makeARow("Area Req:")
 local aRowPeak     = makeARow("Peak Aura:")
 
--- Divider
 local aDivFrame = Instance.new("Frame")
 aDivFrame.Size = UDim2.new(0.9, 0, 0, 1)
 aDivFrame.Position = UDim2.new(0.05, 0, 0, yA)
@@ -793,7 +877,6 @@ local aRowEff      = makeARow("Efficiency:",      nil, true)
 local aRowRecThres = makeARow("Rec. threshold:",  nil, true)
 local aRowReason   = makeARow("Reason:",          nil, true)
 
--- Scan button
 local aScanBtn = Instance.new("TextButton")
 aScanBtn.Size = UDim2.new(1, -16, 0, 26)
 aScanBtn.Position = UDim2.new(0, 8, 0, yA + 4)
@@ -809,130 +892,8 @@ yA = yA + 36
 
 PanelAnalyzer.CanvasSize = UDim2.new(0, 0, 0, yA + 4)
 
--- Scan logic
-aScanBtn.MouseButton1Click:Connect(function()
-    if analyzerScanning then return end
-    analyzerScanning = true
-    aScanBtn.Text = "⏳ Scanning..."
-    aScanBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-
-    local ok2, err = pcall(function()
-        local samples = {}
-        for i = 1, SAMPLE_A do
-            table.insert(samples, getAura())
-            task.wait(1)
-        end
-        local deltas = {}
-        for i = 2, #samples do
-            local d = samples[i] - samples[i-1]
-            if d > 0 then table.insert(deltas, d) end
-        end
-        local auraSec = 0
-        if #deltas > 0 then
-            local sum = 0
-            for _, v in ipairs(deltas) do sum += v end
-            auraSec = sum / #deltas
-        end
-        lastAuraSec = auraSec
-
-        local auraHour  = auraSec * 3600
-        local areaMult  = player:GetAttribute("AreaMultiplier") or 1
-        local eventMult = player:GetAttribute("GlobalAuraEventMultiplier") or 1
-        local rebirths  = player:GetAttribute("Rebirths") or 0
-        local areaReq   = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
-        local peakAura  = player:GetAttribute("PeakAura") or 0
-        local area      = player:GetAttribute("CurrentArea") or "—"
-        local curAura   = getAura()
-
-        -- Efficiency: base aura/sec tanpa multipliers
-        local efficiency = 0
-        if areaMult > 0 and eventMult > 0 then
-            efficiency = auraSec / (areaMult * eventMult)
-        end
-
-        -- Time to rebirth at 1.1x
-        local recThresh = 1.1
-        local timeToReb = 0
-        if auraSec > 0 and areaReq > 0 then
-            local needed = math.max(0, areaReq * recThresh - curAura)
-            timeToReb = needed / auraSec
-        end
-
-        -- Reason
-        local reason = curAura >= areaReq * 0.9
-            and "Almost there, rebirth now!"
-            or  "Mult resets on rebirth"
-
-        -- Update rows
-        aRowArea.Text     = tostring(area)
-        aRowSec.Text      = fmtA(auraSec) .. "/s"
-        aRowHour.Text     = fmtA(auraHour) .. "/hr"
-        aRowMult.Text     = fmtA(areaMult)
-        aRowEvent.Text    = tostring(eventMult) .. "x"
-        aRowRebirths.Text = fmtA(rebirths)
-        aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
-        aRowPeak.Text     = fmtA(peakAura)
-        aRowEff.Text      = efficiency > 0 and fmtA(efficiency).."/s per Mult" or "—"
-        aRowRecThres.Text = string.format("%.1fx", recThresh)
-        aRowRecThres.TextColor3 = Color3.fromRGB(100, 220, 255)
-        aRowReason.Text   = reason
-        aRowReason.TextColor3 = Color3.fromRGB(200, 180, 255)
-
-        if timeToReb <= 0 then
-            aRowTimeReb.Text = "Rebirth now!"
-            aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
-        else
-            aRowTimeReb.Text = fmtTime(timeToReb)
-            aRowTimeReb.TextColor3 = timeToReb < 60
-                and Color3.fromRGB(255, 200, 80)
-                or  Color3.fromRGB(100, 255, 150)
-        end
-    end)
-
-    if not ok2 then
-        aRowSec.Text = "ERROR"
-        aRowSec.TextColor3 = RED
-        print("Analyzer error: " .. tostring(err))
-    end
-
-    aScanBtn.Text = "🔍 Scan (10s)"
-    aScanBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 160)
-    analyzerScanning = false
-end)
-
--- Live update analyzer rows (non-scan)
-task.spawn(function()
-    while ScreenGui.Parent do
-        if activeTab == "analyzer" then
-            local curAura  = getAura()
-            local areaReq  = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
-            aRowArea.Text     = tostring(player:GetAttribute("CurrentArea") or "—")
-            aRowMult.Text     = fmtA(player:GetAttribute("AreaMultiplier") or 1)
-            aRowEvent.Text    = tostring(player:GetAttribute("GlobalAuraEventMultiplier") or 1) .. "x"
-            aRowRebirths.Text = fmtA(player:GetAttribute("Rebirths") or 0)
-            aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
-            aRowPeak.Text     = fmtA(player:GetAttribute("PeakAura") or 0)
-            -- Live countdown
-            if lastAuraSec > 0 and areaReq > 0 then
-                local needed = math.max(0, areaReq * 1.1 - curAura)
-                local t = needed / lastAuraSec
-                if t <= 0 then
-                    aRowTimeReb.Text = "Rebirth now!"
-                    aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
-                else
-                    aRowTimeReb.Text = fmtTime(t)
-                    aRowTimeReb.TextColor3 = t < 60
-                        and Color3.fromRGB(255, 200, 80)
-                        or  Color3.fromRGB(100, 255, 150)
-                end
-            end
-        end
-        task.wait(2)
-    end
-end)
-
 -- ─── Resize Main ─────────────────────────────────────────────────────────────
-local contentH = math.max(yF, yC, yA) + 4
+local contentH = math.max(yF, yC, kRef[1], yA) + 4
 local fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
@@ -944,24 +905,28 @@ local function switchTab(tab)
     activeTab = tab
     PanelFarm.Visible     = (tab == "farm")
     PanelConfig.Visible   = (tab == "config")
+    PanelKOTH.Visible     = (tab == "koth")
     PanelAnalyzer.Visible = (tab == "analyzer")
 
     TabFarm.TextColor3     = tab == "farm"     and WHITE or DIM
     TabConfig.TextColor3   = tab == "config"   and WHITE or DIM
+    TabKOTH.TextColor3     = tab == "koth"     and GOLD  or DIM
     TabAnalyzer.TextColor3 = tab == "analyzer" and WHITE or DIM
 
     TweenService:Create(TabFarm,     tweenInfo, {BackgroundTransparency = tab == "farm"     and 0.6 or 1}):Play()
     TweenService:Create(TabConfig,   tweenInfo, {BackgroundTransparency = tab == "config"   and 0.6 or 1}):Play()
+    TweenService:Create(TabKOTH,     tweenInfo, {BackgroundTransparency = tab == "koth"     and 0.6 or 1}):Play()
     TweenService:Create(TabAnalyzer, tweenInfo, {BackgroundTransparency = tab == "analyzer" and 0.6 or 1}):Play()
 
-    local indicatorY = tab == "farm" and 13 or tab == "config" and 55 or 97
+    local indicatorY = tab == "farm" and 13 or tab == "config" and 55 or tab == "koth" and 97 or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, indicatorY)}):Play()
 end
 
-TabFarm.MouseButton1Click:Connect(function() switchTab("farm") end)
-TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
+TabFarm.MouseButton1Click:Connect(function()     switchTab("farm")     end)
+TabConfig.MouseButton1Click:Connect(function()   switchTab("config")   end)
+TabKOTH.MouseButton1Click:Connect(function()     switchTab("koth")     end)
 TabAnalyzer.MouseButton1Click:Connect(function() switchTab("analyzer") end)
-switchTab("farm")  -- default
+switchTab("farm")
 
 -- ─── Popup ───────────────────────────────────────────────────────────────────
 local POPUP_W = 200
@@ -1078,29 +1043,17 @@ local bottomY = listStartY + (#areas * (POPUP_ITEM_H + 2)) + 4
 local btnY = bottomY + 4
 
 local CancelBtn = Instance.new("TextButton")
-CancelBtn.Size = UDim2.new(0.44, 0, 0, 22)
-CancelBtn.Position = UDim2.new(0.04, 0, 0, btnY)
-CancelBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 55)
-CancelBtn.BorderSizePixel = 0
-CancelBtn.Text = "Cancel"
-CancelBtn.TextColor3 = WHITE
-CancelBtn.TextSize = 10
-CancelBtn.Font = Enum.Font.GothamBold
-CancelBtn.ZIndex = 12
-CancelBtn.Parent = Popup
+CancelBtn.Size = UDim2.new(0.44, 0, 0, 22); CancelBtn.Position = UDim2.new(0.04, 0, 0, btnY)
+CancelBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 55); CancelBtn.BorderSizePixel = 0
+CancelBtn.Text = "Cancel"; CancelBtn.TextColor3 = WHITE; CancelBtn.TextSize = 10
+CancelBtn.Font = Enum.Font.GothamBold; CancelBtn.ZIndex = 12; CancelBtn.Parent = Popup
 Instance.new("UICorner", CancelBtn).CornerRadius = UDim.new(0, 6)
 
 local SetBtn = Instance.new("TextButton")
-SetBtn.Size = UDim2.new(0.44, 0, 0, 22)
-SetBtn.Position = UDim2.new(0.52, 0, 0, btnY)
-SetBtn.BackgroundColor3 = PURPLE
-SetBtn.BorderSizePixel = 0
-SetBtn.Text = "Set"
-SetBtn.TextColor3 = WHITE
-SetBtn.TextSize = 10
-SetBtn.Font = Enum.Font.GothamBold
-SetBtn.ZIndex = 12
-SetBtn.Parent = Popup
+SetBtn.Size = UDim2.new(0.44, 0, 0, 22); SetBtn.Position = UDim2.new(0.52, 0, 0, btnY)
+SetBtn.BackgroundColor3 = PURPLE; SetBtn.BorderSizePixel = 0
+SetBtn.Text = "Set"; SetBtn.TextColor3 = WHITE; SetBtn.TextSize = 10
+SetBtn.Font = Enum.Font.GothamBold; SetBtn.ZIndex = 12; SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0, 6)
 
 -- ─── Toggle Helper ───────────────────────────────────────────────────────────
@@ -1133,6 +1086,195 @@ local function updateStatus()
         WarnLabel.Text = ""
     end
 end
+
+-- ─── KOTH UI Update ──────────────────────────────────────────────────────────
+local function updateKOTHUI()
+    kRowStatus.Text = kothClaimed and "👑 Claimed" or "✅ Empty"
+    kRowStatus.TextColor3 = kothClaimed and GOLD or GREEN
+    kRowKing.Text = kothKingName
+    kRowKingA.Text = kothKingAura > 0 and formatNum(kothKingAura) or "—"
+    kRowMyA.Text = formatNum(getAura())
+    kRowHops.Text = tostring(kothHopCount)
+
+    if not kothClaimed then
+        kRowResult.Text = "Empty - Enter!"
+        kRowResult.TextColor3 = GREEN
+    elseif kothKingAura > 0 then
+        if getAura() > kothKingAura then
+            kRowResult.Text = "✅ Can Win"
+            kRowResult.TextColor3 = GREEN
+        else
+            kRowResult.Text = "❌ Too Strong"
+            kRowResult.TextColor3 = RED
+        end
+    else
+        kRowResult.Text = "Checking..."
+        kRowResult.TextColor3 = DIM
+    end
+end
+
+-- ─── KOTH Server Hop ─────────────────────────────────────────────────────────
+local TeleportService = game:GetService("TeleportService")
+local placeId = game.PlaceId
+
+local function doServerHop()
+    if isHopping then return end
+    isHopping = true
+    isInKOTH = false
+    kothHopCount += 1
+    kRowHops.Text = tostring(kothHopCount)
+    task.wait(1)
+    pcall(function() TeleportService:Teleport(placeId, player) end)
+end
+
+-- ─── KOTH Remote Listeners ───────────────────────────────────────────────────
+local KOTHStateChanged = RS:FindFirstChild("Packages") and
+    RS.Packages:FindFirstChild("Knit") and
+    RS.Packages.Knit:FindFirstChild("Services") and
+    RS.Packages.Knit.Services:FindFirstChild("KOTHService") and
+    RS.Packages.Knit.Services.KOTHService:FindFirstChild("RE") and
+    RS.Packages.Knit.Services.KOTHService.RE:FindFirstChild("KOTHStateChanged")
+
+local AreaStatusChanged = RS:FindFirstChild("Packages") and
+    RS.Packages:FindFirstChild("Knit") and
+    RS.Packages.Knit:FindFirstChild("Services") and
+    RS.Packages.Knit.Services:FindFirstChild("KOTHService") and
+    RS.Packages.Knit.Services.KOTHService:FindFirstChild("RE") and
+    RS.Packages.Knit.Services.KOTHService.RE:FindFirstChild("AreaStatusChanged")
+
+-- Fallback: scan seluruh RS untuk cari remote yang betul
+local function findRemote(name)
+    local function search(obj)
+        for _, v in ipairs(obj:GetDescendants()) do
+            if (v:IsA("RemoteEvent") or v:IsA("BindableEvent")) and v.Name == name then
+                return v
+            end
+        end
+    end
+    return search(RS) or search(game:GetService("Players"))
+end
+
+if not KOTHStateChanged then
+    KOTHStateChanged = findRemote("KOTHStateChanged")
+end
+if not AreaStatusChanged then
+    AreaStatusChanged = findRemote("AreaStatusChanged")
+end
+
+-- Listen KOTHStateChanged
+if KOTHStateChanged then
+    KOTHStateChanged.OnClientEvent:Connect(function(data)
+        if not data then return end
+        kothClaimed = data.IsClaimed or false
+
+        if kothClaimed then
+            -- Ada orang dalam KOTH
+            local kingId = data.KingUserId
+            kothKingName = "—"
+            kothKingAura = 0
+
+            -- Cari player dengan UserId tu dalam server semasa
+            if kingId then
+                for _, p in ipairs(game.Players:GetPlayers()) do
+                    if p.UserId == kingId then
+                        kothKingName = p.Name
+                        kothKingAura = p:GetAttribute("Aura") or 0
+                        break
+                    end
+                end
+            end
+
+            updateKOTHUI()
+
+            -- Auto KOTH logic
+            if autoKOTH and not isInKOTH then
+                if kothKingAura > 0 and getAura() > kothKingAura then
+                    -- Kau lagi kuat, masuk
+                    task.wait(0.5)
+                    teleport(kothPos)
+                    isInKOTH = true
+                elseif kothKingAura > 0 then
+                    -- Dia lagi kuat, server hop
+                    doServerHop()
+                end
+                -- Kalau kingId tak jumpa dalam server (lain server), hop
+                if kothKingAura == 0 and kingId then
+                    doServerHop()
+                end
+            end
+        else
+            -- KOTH kosong
+            kothKingName = "—"
+            kothKingAura = 0
+            updateKOTHUI()
+
+            if autoKOTH and not isInKOTH then
+                task.wait(0.5)
+                teleport(kothPos)
+                isInKOTH = true
+            end
+        end
+    end)
+end
+
+-- Listen AreaStatusChanged — kau kena reject/kalah
+if AreaStatusChanged then
+    AreaStatusChanged.OnClientEvent:Connect(function()
+        if autoKOTH and isInKOTH then
+            isInKOTH = false
+            updateKOTHUI()
+            task.wait(1)
+            doServerHop()
+        end
+    end)
+end
+
+-- ─── KOTH Live Update (every 2s) ─────────────────────────────────────────────
+task.spawn(function()
+    while ScreenGui.Parent do
+        if activeTab == "koth" then
+            -- Update aura kau dan king secara live
+            kRowMyA.Text = formatNum(getAura())
+            if kothKingName ~= "—" then
+                for _, p in ipairs(game.Players:GetPlayers()) do
+                    if p.Name == kothKingName then
+                        kothKingAura = p:GetAttribute("Aura") or kothKingAura
+                        break
+                    end
+                end
+                kRowKingA.Text = formatNum(kothKingAura)
+                -- Update result
+                if kothClaimed and kothKingAura > 0 then
+                    if getAura() > kothKingAura then
+                        kRowResult.Text = "✅ Can Win"
+                        kRowResult.TextColor3 = GREEN
+                    else
+                        kRowResult.Text = "❌ Too Strong"
+                        kRowResult.TextColor3 = RED
+                    end
+                end
+            end
+        end
+        task.wait(2)
+    end
+end)
+
+-- ─── KOTH Toggle & Force Hop ─────────────────────────────────────────────────
+KOTHBtn.MouseButton1Click:Connect(function()
+    autoKOTH = not autoKOTH
+    setToggle(KOTHPill, KOTHDot, KOTHStroke, autoKOTH)
+    if not autoKOTH then
+        isInKOTH = false
+        isHopping = false
+    end
+end)
+
+kHopBtn.MouseButton1Click:Connect(function()
+    kothHopCount += 1
+    kRowHops.Text = tostring(kothHopCount)
+    task.wait(0.5)
+    pcall(function() TeleportService:Teleport(placeId, player) end)
+end)
 
 -- ─── Popup Logic ─────────────────────────────────────────────────────────────
 local function refreshPopupItems()
@@ -1263,7 +1405,6 @@ local function autoSave()
     end)
 end
 
--- Rebuild config list UI
 local function rebuildConfigList()
     for _, c in pairs(configList:GetChildren()) do
         if c:IsA("TextButton") then c:Destroy() end
@@ -1272,7 +1413,6 @@ local function rebuildConfigList()
     local autoLoadName = configs[AUTOLOAD_KEY]
     btnAutoLoad.Text = autoLoadName and ("⚡  Auto Load: "..autoLoadName) or "⚡  Set Auto Load: None"
     btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20, 100, 30) or Color3.fromRGB(60, 40, 10)
-
     local hasAny = false
     for name, _ in pairs(configs) do
         if name == AUTOLOAD_KEY then continue end
@@ -1292,24 +1432,18 @@ local function rebuildConfigList()
         item.Parent = configList
         Instance.new("UICorner", item).CornerRadius = UDim.new(0, 4)
         item.MouseButton1Click:Connect(function()
-            selectedCfg = name
-            rebuildConfigList()
+            selectedCfg = name; rebuildConfigList()
         end)
     end
     if not hasAny then
         local empty = Instance.new("TextLabel")
-        empty.Size = UDim2.new(1, 0, 0, 22)
-        empty.BackgroundTransparency = 1
-        empty.Text = "  No configs saved"
-        empty.TextColor3 = DIM
-        empty.TextSize = 9
-        empty.Font = Enum.Font.Gotham
-        empty.TextXAlignment = Enum.TextXAlignment.Left
-        empty.Parent = configList
+        empty.Size = UDim2.new(1, 0, 0, 22); empty.BackgroundTransparency = 1
+        empty.Text = "  No configs saved"; empty.TextColor3 = DIM
+        empty.TextSize = 9; empty.Font = Enum.Font.Gotham
+        empty.TextXAlignment = Enum.TextXAlignment.Left; empty.Parent = configList
     end
 end
 
--- Config buttons
 btnSave.MouseButton1Click:Connect(function()
     if not hasFS then setConfigStatus("⚠ Executor tak support!", true); return end
     local name = configNameBox.Text:gsub("%s+", "")
@@ -1429,7 +1563,8 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    autoTraining = false; autoRebirth = false; autoCombo = false; zoneGuard = false
+    autoTraining = false; autoRebirth = false; autoCombo = false
+    zoneGuard = false; autoKOTH = false
     ScreenGui:Destroy()
 end)
 
@@ -1460,6 +1595,8 @@ end)
 -- ─── Respawn ─────────────────────────────────────────────────────────────────
 player.CharacterAdded:Connect(function()
     task.wait(3)
+    isInKOTH = false
+    isHopping = false
     if autoTraining or autoCombo or zoneGuard then
         local best = getBestArea(getAura())
         if best then teleport(best.pos); currentArea = best.name end
@@ -1534,6 +1671,122 @@ task.spawn(function()
     end
 end)
 
+-- ─── Analyzer Scan Logic ─────────────────────────────────────────────────────
+aScanBtn.MouseButton1Click:Connect(function()
+    if analyzerScanning then return end
+    analyzerScanning = true
+    aScanBtn.Text = "⏳ Scanning..."
+    aScanBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+
+    local ok2, err = pcall(function()
+        local samples = {}
+        for i = 1, SAMPLE_A do
+            table.insert(samples, getAura())
+            task.wait(1)
+        end
+        local deltas = {}
+        for i = 2, #samples do
+            local d = samples[i] - samples[i-1]
+            if d > 0 then table.insert(deltas, d) end
+        end
+        local auraSec = 0
+        if #deltas > 0 then
+            local sum = 0
+            for _, v in ipairs(deltas) do sum += v end
+            auraSec = sum / #deltas
+        end
+        lastAuraSec = auraSec
+
+        local auraHour  = auraSec * 3600
+        local areaMult  = player:GetAttribute("AreaMultiplier") or 1
+        local eventMult = player:GetAttribute("GlobalAuraEventMultiplier") or 1
+        local rebirths  = player:GetAttribute("Rebirths") or 0
+        local areaReq   = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
+        local peakAura  = player:GetAttribute("PeakAura") or 0
+        local area      = player:GetAttribute("CurrentArea") or "—"
+        local curAura   = getAura()
+
+        local efficiency = 0
+        if areaMult > 0 and eventMult > 0 then
+            efficiency = auraSec / (areaMult * eventMult)
+        end
+
+        local recThresh = 1.1
+        local timeToReb = 0
+        if auraSec > 0 and areaReq > 0 then
+            local needed = math.max(0, areaReq * recThresh - curAura)
+            timeToReb = needed / auraSec
+        end
+
+        local reason = curAura >= areaReq * 0.9
+            and "Almost there, rebirth now!"
+            or  "Mult resets on rebirth"
+
+        aRowArea.Text     = tostring(area)
+        aRowSec.Text      = fmtA(auraSec) .. "/s"
+        aRowHour.Text     = fmtA(auraHour) .. "/hr"
+        aRowMult.Text     = fmtA(areaMult)
+        aRowEvent.Text    = tostring(eventMult) .. "x"
+        aRowRebirths.Text = fmtA(rebirths)
+        aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
+        aRowPeak.Text     = fmtA(peakAura)
+        aRowEff.Text      = efficiency > 0 and fmtA(efficiency).."/s per Mult" or "—"
+        aRowRecThres.Text = string.format("%.1fx", recThresh)
+        aRowRecThres.TextColor3 = Color3.fromRGB(100, 220, 255)
+        aRowReason.Text   = reason
+        aRowReason.TextColor3 = Color3.fromRGB(200, 180, 255)
+
+        if timeToReb <= 0 then
+            aRowTimeReb.Text = "Rebirth now!"
+            aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
+        else
+            aRowTimeReb.Text = fmtTime(timeToReb)
+            aRowTimeReb.TextColor3 = timeToReb < 60
+                and Color3.fromRGB(255, 200, 80)
+                or  Color3.fromRGB(100, 255, 150)
+        end
+    end)
+
+    if not ok2 then
+        aRowSec.Text = "ERROR"
+        aRowSec.TextColor3 = RED
+        print("Analyzer error: " .. tostring(err))
+    end
+
+    aScanBtn.Text = "🔍 Scan (10s)"
+    aScanBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 160)
+    analyzerScanning = false
+end)
+
+task.spawn(function()
+    while ScreenGui.Parent do
+        if activeTab == "analyzer" then
+            local curAura  = getAura()
+            local areaReq  = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
+            aRowArea.Text     = tostring(player:GetAttribute("CurrentArea") or "—")
+            aRowMult.Text     = fmtA(player:GetAttribute("AreaMultiplier") or 1)
+            aRowEvent.Text    = tostring(player:GetAttribute("GlobalAuraEventMultiplier") or 1) .. "x"
+            aRowRebirths.Text = fmtA(player:GetAttribute("Rebirths") or 0)
+            aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
+            aRowPeak.Text     = fmtA(player:GetAttribute("PeakAura") or 0)
+            if lastAuraSec > 0 and areaReq > 0 then
+                local needed = math.max(0, areaReq * 1.1 - curAura)
+                local t = needed / lastAuraSec
+                if t <= 0 then
+                    aRowTimeReb.Text = "Rebirth now!"
+                    aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
+                else
+                    aRowTimeReb.Text = fmtTime(t)
+                    aRowTimeReb.TextColor3 = t < 60
+                        and Color3.fromRGB(255, 200, 80)
+                        or  Color3.fromRGB(100, 255, 150)
+                end
+            end
+        end
+        task.wait(2)
+    end
+end)
+
 -- ─── Init ────────────────────────────────────────────────────────────────────
 local function initDefaultTarget()
     local next = getNextArea(getAura())
@@ -1542,10 +1795,10 @@ local function initDefaultTarget()
 end
 
 initDefaultTarget()
+updateKOTHUI()
 
--- Auto load saved config on execute
 task.spawn(function()
-    task.wait(0.5)  -- wait for UI ready
+    task.wait(0.5)
     local configs = loadConfigFile()
     if configs and configs[AUTOLOAD_KEY] then
         local autoName = configs[AUTOLOAD_KEY]
@@ -1560,36 +1813,28 @@ task.spawn(function()
     end
 end)
 
-
 -- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
-local TeleportService = game:GetService("TeleportService")
-local placeId = game.PlaceId
-
--- Detect bila game nak teleport/shutdown
 game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.RequestedFromServer then
-        warn("[AutoHub] Server teleport detected - server shutting down/restarting")
+        warn("[AutoHub] Server teleport detected")
         task.wait(3)
         pcall(function() TeleportService:Teleport(placeId, player) end)
     end
 end)
 
--- Detect kick message
 game:GetService("Players").LocalPlayer.Idled:Connect(function(time)
     warn("[AutoHub] Player idle detected - " .. tostring(time) .. "s idle")
 end)
 
--- Detect bila player kena remove (kick/disconnect)
 game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then
         warn("[AutoHub] LocalPlayer removing - possible kick or disconnect")
     end
 end)
 
--- Detect server close
 game:BindToClose(function()
     warn("[AutoHub] Game closing - server shutdown")
     pcall(function() TeleportService:Teleport(placeId, player) end)
 end)
 
-print("Auto Hub v3 loaded!")
+print("Auto Hub v3 loaded! (KOTH tab added)")
