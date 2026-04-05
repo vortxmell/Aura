@@ -34,9 +34,10 @@ local multiplier     = 2
 local comboTarget    = nil
 
 local suffixes = {
-    {1e39,"Dd"},{1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
-    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
-    {1e15,"Qa"},{1e12,"T"}, {1e9,"B"},  {1e6,"M"},{1e3,"K"},
+    {1e45,"Qd"},{1e42,"Td"},{1e39,"Dd"},{1e36,"Ud"},
+    {1e33,"Dc"},{1e30,"No"},{1e27,"Oc"},{1e24,"Sp"},
+    {1e21,"Sx"},{1e18,"Qi"},{1e15,"Qa"},{1e12,"T"},
+    {1e9,"B"},  {1e6,"M"}, {1e3,"K"},
 }
 local function formatNum(n)
     for _,s in ipairs(suffixes) do
@@ -229,6 +230,7 @@ end
 
 local TabFarm   = makeTabBtn("⚡", 8)
 local TabConfig = makeTabBtn("💾", 50)
+local TabAnalyzer = makeTabBtn("📊", 92)
 
 -- Active indicator bar
 local TabIndicator = Instance.new("Frame")
@@ -257,6 +259,8 @@ end
 local PanelFarm   = makeScrollPanel()
 local PanelConfig = makeScrollPanel()
 PanelConfig.Visible = false
+local PanelAnalyzer = makeScrollPanel()
+PanelAnalyzer.Visible = false
 
 -- ─── Row builder helpers (target panel = PanelFarm) ──────────────────────────
 local PAD_X = 10
@@ -714,8 +718,221 @@ yC = yC + 18
 
 PanelConfig.CanvasSize = UDim2.new(0, 0, 0, yC + 4)
 
+-- ─── Build Analyzer Panel ────────────────────────────────────────────────────
+local SAMPLE_A = 10
+local lastAuraSec = 0
+local analyzerScanning = false
+
+local function fmtA(n)
+    if not n or n <= 0 then return "0" end
+    for _, s in ipairs(suffixes) do
+        if n >= s[1] then return string.format("%.2f%s", n/s[1], s[2]) end
+    end
+    return string.format("%.0f", n)
+end
+local function fmtTime(s)
+    s = math.floor(s)
+    if s < 60 then return s.."s"
+    elseif s < 3600 then return math.floor(s/60).."m ".. (s%60).."s"
+    else return math.floor(s/3600).."h "..math.floor((s%3600)/60).."m" end
+end
+
+local yA = GAP
+local function makeARow(labelText, color, isGreen)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -10, 0, 19)
+    bg.Position = UDim2.new(0, 5, 0, yA)
+    bg.BackgroundTransparency = 1
+    bg.Parent = PanelAnalyzer
+    yA = yA + 21
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.52, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = labelText
+    lbl.TextColor3 = isGreen and Color3.fromRGB(140, 220, 140) or Color3.fromRGB(150, 140, 180)
+    lbl.TextSize = 9
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = bg
+
+    local val = Instance.new("TextLabel")
+    val.Size = UDim2.new(0.48, 0, 1, 0)
+    val.Position = UDim2.new(0.52, 0, 0, 0)
+    val.BackgroundTransparency = 1
+    val.Text = color or "—"
+    val.TextColor3 = isGreen and Color3.fromRGB(100, 255, 150) or WHITE
+    val.TextSize = 9
+    val.Font = Enum.Font.Gotham
+    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.Parent = bg
+    return val
+end
+
+-- Rows
+local aRowArea     = makeARow("Area:")
+local aRowSec      = makeARow("Aura/sec:")
+local aRowHour     = makeARow("Aura/hour:")
+local aRowMult     = makeARow("AreaMultiplier:")
+local aRowEvent    = makeARow("EventMult:")
+local aRowRebirths = makeARow("Rebirths:")
+local aRowReq      = makeARow("Area Req:")
+local aRowPeak     = makeARow("Peak Aura:")
+
+-- Divider
+local aDivFrame = Instance.new("Frame")
+aDivFrame.Size = UDim2.new(0.9, 0, 0, 1)
+aDivFrame.Position = UDim2.new(0.05, 0, 0, yA)
+aDivFrame.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+aDivFrame.BorderSizePixel = 0
+aDivFrame.Parent = PanelAnalyzer
+yA = yA + 6
+
+local aRowTimeReb  = makeARow("Time to rebirth:", nil, true)
+local aRowEff      = makeARow("Efficiency:",      nil, true)
+local aRowRecThres = makeARow("Rec. threshold:",  nil, true)
+local aRowReason   = makeARow("Reason:",          nil, true)
+
+-- Scan button
+local aScanBtn = Instance.new("TextButton")
+aScanBtn.Size = UDim2.new(1, -16, 0, 26)
+aScanBtn.Position = UDim2.new(0, 8, 0, yA + 4)
+aScanBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 160)
+aScanBtn.BorderSizePixel = 0
+aScanBtn.Text = "🔍 Scan (10s)"
+aScanBtn.TextColor3 = WHITE
+aScanBtn.TextSize = 11
+aScanBtn.Font = Enum.Font.GothamBold
+aScanBtn.Parent = PanelAnalyzer
+Instance.new("UICorner", aScanBtn).CornerRadius = UDim.new(0, 6)
+yA = yA + 36
+
+PanelAnalyzer.CanvasSize = UDim2.new(0, 0, 0, yA + 4)
+
+-- Scan logic
+aScanBtn.MouseButton1Click:Connect(function()
+    if analyzerScanning then return end
+    analyzerScanning = true
+    aScanBtn.Text = "⏳ Scanning..."
+    aScanBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+
+    local ok2, err = pcall(function()
+        local samples = {}
+        for i = 1, SAMPLE_A do
+            table.insert(samples, getAura())
+            task.wait(1)
+        end
+        local deltas = {}
+        for i = 2, #samples do
+            local d = samples[i] - samples[i-1]
+            if d > 0 then table.insert(deltas, d) end
+        end
+        local auraSec = 0
+        if #deltas > 0 then
+            local sum = 0
+            for _, v in ipairs(deltas) do sum += v end
+            auraSec = sum / #deltas
+        end
+        lastAuraSec = auraSec
+
+        local auraHour  = auraSec * 3600
+        local areaMult  = player:GetAttribute("AreaMultiplier") or 1
+        local eventMult = player:GetAttribute("GlobalAuraEventMultiplier") or 1
+        local rebirths  = player:GetAttribute("Rebirths") or 0
+        local areaReq   = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
+        local peakAura  = player:GetAttribute("PeakAura") or 0
+        local area      = player:GetAttribute("CurrentArea") or "—"
+        local curAura   = getAura()
+
+        -- Efficiency: base aura/sec tanpa multipliers
+        local efficiency = 0
+        if areaMult > 0 and eventMult > 0 then
+            efficiency = auraSec / (areaMult * eventMult)
+        end
+
+        -- Time to rebirth at 1.1x
+        local recThresh = 1.1
+        local timeToReb = 0
+        if auraSec > 0 and areaReq > 0 then
+            local needed = math.max(0, areaReq * recThresh - curAura)
+            timeToReb = needed / auraSec
+        end
+
+        -- Reason
+        local reason = curAura >= areaReq * 0.9
+            and "Almost there, rebirth now!"
+            or  "Mult resets on rebirth"
+
+        -- Update rows
+        aRowArea.Text     = tostring(area)
+        aRowSec.Text      = fmtA(auraSec) .. "/s"
+        aRowHour.Text     = fmtA(auraHour) .. "/hr"
+        aRowMult.Text     = fmtA(areaMult)
+        aRowEvent.Text    = tostring(eventMult) .. "x"
+        aRowRebirths.Text = fmtA(rebirths)
+        aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
+        aRowPeak.Text     = fmtA(peakAura)
+        aRowEff.Text      = efficiency > 0 and fmtA(efficiency).."/s per Mult" or "—"
+        aRowRecThres.Text = string.format("%.1fx", recThresh)
+        aRowRecThres.TextColor3 = Color3.fromRGB(100, 220, 255)
+        aRowReason.Text   = reason
+        aRowReason.TextColor3 = Color3.fromRGB(200, 180, 255)
+
+        if timeToReb <= 0 then
+            aRowTimeReb.Text = "Rebirth now!"
+            aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
+        else
+            aRowTimeReb.Text = fmtTime(timeToReb)
+            aRowTimeReb.TextColor3 = timeToReb < 60
+                and Color3.fromRGB(255, 200, 80)
+                or  Color3.fromRGB(100, 255, 150)
+        end
+    end)
+
+    if not ok2 then
+        aRowSec.Text = "ERROR"
+        aRowSec.TextColor3 = RED
+        print("Analyzer error: " .. tostring(err))
+    end
+
+    aScanBtn.Text = "🔍 Scan (10s)"
+    aScanBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 160)
+    analyzerScanning = false
+end)
+
+-- Live update analyzer rows (non-scan)
+task.spawn(function()
+    while ScreenGui.Parent do
+        if activeTab == "analyzer" then
+            local curAura  = getAura()
+            local areaReq  = player:GetAttribute("AreaRequirement") or player:GetAttribute("AreaReq") or 0
+            aRowArea.Text     = tostring(player:GetAttribute("CurrentArea") or "—")
+            aRowMult.Text     = fmtA(player:GetAttribute("AreaMultiplier") or 1)
+            aRowEvent.Text    = tostring(player:GetAttribute("GlobalAuraEventMultiplier") or 1) .. "x"
+            aRowRebirths.Text = fmtA(player:GetAttribute("Rebirths") or 0)
+            aRowReq.Text      = areaReq > 0 and fmtA(areaReq) or "nil!"
+            aRowPeak.Text     = fmtA(player:GetAttribute("PeakAura") or 0)
+            -- Live countdown
+            if lastAuraSec > 0 and areaReq > 0 then
+                local needed = math.max(0, areaReq * 1.1 - curAura)
+                local t = needed / lastAuraSec
+                if t <= 0 then
+                    aRowTimeReb.Text = "Rebirth now!"
+                    aRowTimeReb.TextColor3 = Color3.fromRGB(255, 120, 120)
+                else
+                    aRowTimeReb.Text = fmtTime(t)
+                    aRowTimeReb.TextColor3 = t < 60
+                        and Color3.fromRGB(255, 200, 80)
+                        or  Color3.fromRGB(100, 255, 150)
+                end
+            end
+        end
+        task.wait(2)
+    end
+end)
+
 -- ─── Resize Main ─────────────────────────────────────────────────────────────
-local contentH = math.max(yF, yC) + 4
+local contentH = math.max(yF, yC, yA) + 4
 local fullH = math.min(PAD_TOP + contentH, MAX_H)
 Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
@@ -725,26 +942,25 @@ local activeTab = "farm"
 
 local function switchTab(tab)
     activeTab = tab
-    PanelFarm.Visible   = (tab == "farm")
-    PanelConfig.Visible = (tab == "config")
+    PanelFarm.Visible     = (tab == "farm")
+    PanelConfig.Visible   = (tab == "config")
+    PanelAnalyzer.Visible = (tab == "analyzer")
 
-    if tab == "farm" then
-        TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, 13)}):Play()
-        TabFarm.TextColor3   = WHITE
-        TabConfig.TextColor3 = DIM
-        TweenService:Create(TabFarm,   tweenInfo, {BackgroundTransparency = 0.6}):Play()
-        TweenService:Create(TabConfig, tweenInfo, {BackgroundTransparency = 1}):Play()
-    else
-        TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, 55)}):Play()
-        TabFarm.TextColor3   = DIM
-        TabConfig.TextColor3 = WHITE
-        TweenService:Create(TabFarm,   tweenInfo, {BackgroundTransparency = 1}):Play()
-        TweenService:Create(TabConfig, tweenInfo, {BackgroundTransparency = 0.6}):Play()
-    end
+    TabFarm.TextColor3     = tab == "farm"     and WHITE or DIM
+    TabConfig.TextColor3   = tab == "config"   and WHITE or DIM
+    TabAnalyzer.TextColor3 = tab == "analyzer" and WHITE or DIM
+
+    TweenService:Create(TabFarm,     tweenInfo, {BackgroundTransparency = tab == "farm"     and 0.6 or 1}):Play()
+    TweenService:Create(TabConfig,   tweenInfo, {BackgroundTransparency = tab == "config"   and 0.6 or 1}):Play()
+    TweenService:Create(TabAnalyzer, tweenInfo, {BackgroundTransparency = tab == "analyzer" and 0.6 or 1}):Play()
+
+    local indicatorY = tab == "farm" and 13 or tab == "config" and 55 or 97
+    TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, indicatorY)}):Play()
 end
 
 TabFarm.MouseButton1Click:Connect(function() switchTab("farm") end)
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
+TabAnalyzer.MouseButton1Click:Connect(function() switchTab("analyzer") end)
 switchTab("farm")  -- default
 
 -- ─── Popup ───────────────────────────────────────────────────────────────────
