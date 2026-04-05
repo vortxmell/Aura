@@ -1,4 +1,4 @@
--- Auto Hub v3 - Final
+-- Auto Hub v3 - Tab Edition
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -38,61 +38,56 @@ local suffixes = {
     {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
     {1e15,"Qa"},{1e12,"T"}, {1e9,"B"},  {1e6,"M"},{1e3,"K"},
 }
-
 local function formatNum(n)
     for _,s in ipairs(suffixes) do
         if n >= s[1] then return string.format("%.1f%s", n/s[1], s[2]) end
     end
     return tostring(math.floor(n))
 end
-
 local function getAura() return player:GetAttribute("Aura") or 0 end
-
 local function teleport(pos)
     local c = player.Character
     if c and c:FindFirstChild("HumanoidRootPart") then
         c.HumanoidRootPart.CFrame = CFrame.new(pos)
     end
 end
-
 local function getBestArea(aura)
     local best = nil
     for _,a in ipairs(areas) do if aura >= a.req then best = a end end
     return best
 end
-
 local function getNextArea(aura)
     for _,a in ipairs(areas) do if aura < a.req then return a end end
     return nil
 end
-
 local function getAreaIndex(area)
     if not area then return 0 end
     for i,a in ipairs(areas) do if a.name == area.name then return i end end
     return 0
 end
-
 local function formatThresh(n)
-    if n == math.floor(n) then
-        return tostring(math.floor(n)) .. "x"
-    else
-        return string.format("%.1fx", n)
-    end
+    if n == math.floor(n) then return tostring(math.floor(n)).."x"
+    else return string.format("%.1fx", n) end
 end
 
--- GUI Constants
+-- ─── Constants ───────────────────────────────────────────────────────────────
+local TAB_W   = 36
 local ROW_H   = 16
 local SEC_H   = 12
 local STAT_H  = 12
 local GAP     = 4
 local PAD_TOP = 38
-local PAD_X   = 12
-local MAX_H   = 420
+local MAX_H   = 440
 local WHITE   = Color3.fromRGB(255, 255, 255)
 local DIM     = Color3.fromRGB(180, 175, 200)
 local PURPLE  = Color3.fromRGB(110, 70, 200)
 local WARN    = Color3.fromRGB(255, 180, 60)
+local GREEN   = Color3.fromRGB(80, 200, 120)
+local RED     = Color3.fromRGB(220, 80, 80)
+local DARK    = Color3.fromRGB(10, 10, 14)
+local PANEL   = Color3.fromRGB(18, 16, 26)
 
+-- ─── ScreenGui ───────────────────────────────────────────────────────────────
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoHub"
 ScreenGui.ResetOnSpawn = false
@@ -101,10 +96,11 @@ ScreenGui.DisplayOrder = 999
 local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 if not ok then ScreenGui.Parent = player.PlayerGui end
 
+-- ─── Main Frame ──────────────────────────────────────────────────────────────
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 300)
+Main.Size = UDim2.new(0, 256, 0, 300)
 Main.Position = UDim2.new(0, 16, 0.5, -150)
-Main.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+Main.BackgroundColor3 = DARK
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -115,7 +111,7 @@ local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = Color3.fromRGB(80, 60, 120)
 MainStroke.Thickness = 1
 
--- Title Bar
+-- ─── Title Bar ───────────────────────────────────────────────────────────────
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 36)
 TitleBar.BackgroundTransparency = 1
@@ -157,100 +153,165 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
 
--- Manual drag via TitleBar
+-- Drag
 local dragging, dragStart, startPos
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = Main.Position
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = i.Position; startPos = Main.Position
     end
 end)
-TitleBar.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = input.Position - dragStart
-        Main.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
+TitleBar.InputChanged:Connect(function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
+        local d = i.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
     end
 end)
-TitleBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+TitleBar.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = false
     end
 end)
 
 local TitleDiv = Instance.new("Frame")
-TitleDiv.Size = UDim2.new(0.85, 0, 0, 1)
-TitleDiv.Position = UDim2.new(0.075, 0, 0, 36)
+TitleDiv.Size = UDim2.new(1, 0, 0, 1)
+TitleDiv.Position = UDim2.new(0, 0, 0, 36)
 TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
 TitleDiv.BorderSizePixel = 0
 TitleDiv.Parent = Main
 
--- Scrollable Content
-local Content = Instance.new("ScrollingFrame")
-Content.Size = UDim2.new(1, 0, 1, -PAD_TOP)
-Content.Position = UDim2.new(0, 0, 0, PAD_TOP)
-Content.BackgroundTransparency = 1
-Content.BorderSizePixel = 0
-Content.ScrollBarThickness = 2
-Content.ScrollBarImageColor3 = PURPLE
-Content.CanvasSize = UDim2.new(0, 0, 0, 0)
-Content.ScrollingDirection = Enum.ScrollingDirection.Y
-Content.ElasticBehavior = Enum.ElasticBehavior.Never
-Content.Parent = Main
+-- ─── Tab Bar (kiri) ──────────────────────────────────────────────────────────
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(0, TAB_W, 1, -PAD_TOP)
+TabBar.Position = UDim2.new(0, 0, 0, PAD_TOP)
+TabBar.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+TabBar.BackgroundTransparency = 0.2
+TabBar.BorderSizePixel = 0
+TabBar.Parent = Main
 
-local y = GAP
-local function nextY(h) local c=y; y=y+h+GAP; return c end
+local TabBarCorner = Instance.new("UICorner", TabBar)
+TabBarCorner.CornerRadius = UDim.new(0, 10)
 
-local function makeDivider()
+-- Vertical divider between tab bar and content
+local TabDiv = Instance.new("Frame")
+TabDiv.Size = UDim2.new(0, 1, 1, -PAD_TOP)
+TabDiv.Position = UDim2.new(0, TAB_W, 0, PAD_TOP)
+TabDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+TabDiv.BorderSizePixel = 0
+TabDiv.Parent = Main
+
+-- ─── Content Area (kanan) ────────────────────────────────────────────────────
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -(TAB_W+1), 1, -PAD_TOP)
+ContentArea.Position = UDim2.new(0, TAB_W+1, 0, PAD_TOP)
+ContentArea.BackgroundTransparency = 1
+ContentArea.BorderSizePixel = 0
+ContentArea.ClipsDescendants = true
+ContentArea.Parent = Main
+
+-- ─── Helper: make tab button ─────────────────────────────────────────────────
+local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
+local function makeTabBtn(icon, posY)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 0, 34)
+    btn.Position = UDim2.new(0, 3, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel = 0
+    btn.Text = icon
+    btn.TextColor3 = DIM
+    btn.TextSize = 16
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+local TabFarm   = makeTabBtn("⚡", 8)
+local TabConfig = makeTabBtn("💾", 50)
+
+-- Active indicator bar
+local TabIndicator = Instance.new("Frame")
+TabIndicator.Size = UDim2.new(0, 3, 0, 24)
+TabIndicator.Position = UDim2.new(0, 0, 0, 13)
+TabIndicator.BackgroundColor3 = PURPLE
+TabIndicator.BorderSizePixel = 0
+TabIndicator.Parent = TabBar
+Instance.new("UICorner", TabIndicator).CornerRadius = UDim.new(0, 4)
+
+-- ─── Scrolling panels ────────────────────────────────────────────────────────
+local function makeScrollPanel()
+    local s = Instance.new("ScrollingFrame")
+    s.Size = UDim2.new(1, 0, 1, 0)
+    s.BackgroundTransparency = 1
+    s.BorderSizePixel = 0
+    s.ScrollBarThickness = 2
+    s.ScrollBarImageColor3 = PURPLE
+    s.CanvasSize = UDim2.new(0, 0, 0, 0)
+    s.ScrollingDirection = Enum.ScrollingDirection.Y
+    s.ElasticBehavior = Enum.ElasticBehavior.Never
+    s.Parent = ContentArea
+    return s
+end
+
+local PanelFarm   = makeScrollPanel()
+local PanelConfig = makeScrollPanel()
+PanelConfig.Visible = false
+
+-- ─── Row builder helpers (target panel = PanelFarm) ──────────────────────────
+local PAD_X = 10
+local yF = GAP  -- y cursor for farm panel
+
+local function nextYF(h) local c=yF; yF=yF+h+GAP; return c end
+
+local function makeDividerIn(panel, yc)
     local d = Instance.new("Frame")
-    d.Size = UDim2.new(0.85, 0, 0, 1)
-    d.Position = UDim2.new(0.075, 0, 0, nextY(1))
+    d.Size = UDim2.new(0.9, 0, 0, 1)
+    d.Position = UDim2.new(0.05, 0, 0, yc)
     d.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     d.BorderSizePixel = 0
-    d.Parent = Content
+    d.Parent = panel
+end
+
+local function makeDivider()
+    makeDividerIn(PanelFarm, nextYF(1))
 end
 
 local function makeStatusLabel(text, color)
     local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1, -20, 0, STAT_H)
-    l.Position = UDim2.new(0, PAD_X, 0, nextY(STAT_H))
+    l.Size = UDim2.new(1, -16, 0, STAT_H)
+    l.Position = UDim2.new(0, PAD_X, 0, nextYF(STAT_H))
     l.BackgroundTransparency = 1
     l.Text = text
     l.TextColor3 = color or WHITE
     l.TextSize = 9
     l.Font = Enum.Font.Gotham
     l.TextXAlignment = Enum.TextXAlignment.Left
-    l.Parent = Content
+    l.Parent = PanelFarm
     return l
 end
 
 local function makeSection(text)
     local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1, -20, 0, SEC_H)
-    l.Position = UDim2.new(0, PAD_X+2, 0, nextY(SEC_H))
+    l.Size = UDim2.new(1, -16, 0, SEC_H)
+    l.Position = UDim2.new(0, PAD_X+2, 0, nextYF(SEC_H))
     l.BackgroundTransparency = 1
     l.Text = text
     l.TextColor3 = WHITE
     l.TextSize = 8
     l.Font = Enum.Font.GothamBold
     l.TextXAlignment = Enum.TextXAlignment.Left
-    l.Parent = Content
+    l.Parent = PanelFarm
 end
 
 local function makeToggleRow(labelText)
-    local rowY = nextY(ROW_H)
+    local rowY = nextYF(ROW_H)
     local Btn = Instance.new("Frame")
     Btn.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     Btn.Position = UDim2.new(0, PAD_X, 0, rowY)
-    Btn.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    Btn.BackgroundColor3 = PANEL
     Btn.BorderSizePixel = 0
-    Btn.Parent = Content
+    Btn.Parent = PanelFarm
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
     local BtnStroke = Instance.new("UIStroke", Btn)
     BtnStroke.Color = Color3.fromRGB(60, 45, 90)
@@ -287,14 +348,15 @@ local function makeToggleRow(labelText)
     return Hitbox, Pill, Dot, BtnStroke
 end
 
-local function makeInputRow(labelText, defaultVal, step)
-    local rowY = nextY(ROW_H)
+-- Threshold row - TextBox boleh type
+local function makeThresholdRow(labelText, defaultVal)
+    local rowY = nextYF(ROW_H)
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
-    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BackgroundColor3 = PANEL
     TFrame.BorderSizePixel = 0
-    TFrame.Parent = Content
+    TFrame.Parent = PanelFarm
     Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
@@ -320,7 +382,8 @@ local function makeInputRow(labelText, defaultVal, step)
     MinusB.Font = Enum.Font.GothamBold
     MinusB.Parent = TFrame
     Instance.new("UICorner", MinusB).CornerRadius = UDim.new(1, 0)
-    local InputBox = Instance.new("TextLabel")
+    -- TextBox boleh type
+    local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 38, 0, 14)
     InputBox.Position = UDim2.new(1, -58, 0.5, -7)
     InputBox.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
@@ -329,7 +392,7 @@ local function makeInputRow(labelText, defaultVal, step)
     InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
-    -- ClearTextOnFocus removed (TextLabel)
+    InputBox.ClearTextOnFocus = true
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
     local PlusB = Instance.new("TextButton")
@@ -347,13 +410,13 @@ local function makeInputRow(labelText, defaultVal, step)
 end
 
 local function makeInputToggleRow(labelText, defaultVal)
-    local rowY = nextY(ROW_H)
+    local rowY = nextYF(ROW_H)
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
-    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BackgroundColor3 = PANEL
     TFrame.BorderSizePixel = 0
-    TFrame.Parent = Content
+    TFrame.Parent = PanelFarm
     Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
@@ -407,7 +470,7 @@ local function makeInputToggleRow(labelText, defaultVal)
     InputBox.TextColor3 = WHITE
     InputBox.TextSize = 9
     InputBox.Font = Enum.Font.GothamBold
-    -- ClearTextOnFocus removed (TextLabel)
+    InputBox.ClearTextOnFocus = true
     InputBox.Parent = TFrame
     Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
     local PlusB = Instance.new("TextButton")
@@ -425,13 +488,13 @@ local function makeInputToggleRow(labelText, defaultVal)
 end
 
 local function makeTargetRow()
-    local rowY = nextY(ROW_H)
+    local rowY = nextYF(ROW_H)
     local TFrame = Instance.new("Frame")
     TFrame.Size = UDim2.new(1, -PAD_X*2, 0, ROW_H)
     TFrame.Position = UDim2.new(0, PAD_X, 0, rowY)
-    TFrame.BackgroundColor3 = Color3.fromRGB(18, 16, 26)
+    TFrame.BackgroundColor3 = PANEL
     TFrame.BorderSizePixel = 0
-    TFrame.Parent = Content
+    TFrame.Parent = PanelFarm
     Instance.new("UICorner", TFrame).CornerRadius = UDim.new(0, 6)
     local TStroke = Instance.new("UIStroke", TFrame)
     TStroke.Color = Color3.fromRGB(60, 45, 90)
@@ -473,7 +536,7 @@ local function makeTargetRow()
     return Hitbox, TVal, TStroke
 end
 
--- Build layout
+-- ─── Build Farm Panel ────────────────────────────────────────────────────────
 local StatusLabel = makeStatusLabel("Area: —")
 makeDivider()
 makeSection("INDIVIDUAL")
@@ -483,7 +546,7 @@ makeDivider()
 makeSection("COMBO")
 local ComboBtn,  ComboPill,  ComboDot,  ComboStroke  = makeToggleRow("Train + Rebirth")
 local TargetBtn, TargetVal,  TargetStroke             = makeTargetRow()
-local ThreshMinus, ThreshBox, ThreshPlus, ThreshStroke = makeInputRow("Threshold", threshold, 1)
+local ThreshMinus, ThreshBox, ThreshPlus, ThreshStroke = makeThresholdRow("Threshold", threshold)
 local MultHitbox, MultPill, MultDot, MultStroke, MultMinus, MultBox, MultPlus = makeInputToggleRow("Multiplier", multiplier)
 makeDivider()
 local RebirthTargetLabel = makeStatusLabel("Rebirth at: —")
@@ -494,17 +557,200 @@ makeDivider()
 makeSection("UTILITY")
 local ZoneBtn, ZonePill, ZoneDot, ZoneStroke = makeToggleRow("Zone Guard")
 
--- Set canvas and frame size
-local contentH = y + 4
-Content.CanvasSize = UDim2.new(0, 0, 0, contentH)
+-- Set farm panel canvas
+PanelFarm.CanvasSize = UDim2.new(0, 0, 0, yF + 4)
+
+-- ─── Build Config Panel ──────────────────────────────────────────────────────
+local yC = GAP
+
+local function makeCLabel(text, y, color, size)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -16, 0, 14)
+    l.Position = UDim2.new(0, 8, 0, y)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or WHITE
+    l.TextSize = size or 9
+    l.Font = Enum.Font.GothamBold
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = PanelConfig
+    return l
+end
+
+-- Title
+makeCLabel("💾  CONFIGURATION", yC, WHITE, 10)
+yC = yC + 18
+
+-- Divider
+local cd1 = Instance.new("Frame")
+cd1.Size = UDim2.new(0.9, 0, 0, 1)
+cd1.Position = UDim2.new(0.05, 0, 0, yC)
+cd1.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+cd1.BorderSizePixel = 0
+cd1.Parent = PanelConfig
+yC = yC + 6
+
+-- Name input
+makeCLabel("Config name:", yC, DIM, 8)
+yC = yC + 14
+
+local configNameBox = Instance.new("TextBox")
+configNameBox.Size = UDim2.new(1, -16, 0, 22)
+configNameBox.Position = UDim2.new(0, 8, 0, yC)
+configNameBox.BackgroundColor3 = Color3.fromRGB(25, 20, 38)
+configNameBox.BorderSizePixel = 0
+configNameBox.PlaceholderText = "Enter name..."
+configNameBox.PlaceholderColor3 = DIM
+configNameBox.Text = ""
+configNameBox.TextColor3 = WHITE
+configNameBox.TextSize = 10
+configNameBox.Font = Enum.Font.Gotham
+configNameBox.ClearTextOnFocus = false
+configNameBox.Parent = PanelConfig
+Instance.new("UICorner", configNameBox).CornerRadius = UDim.new(0, 6)
+local cns = Instance.new("UIStroke", configNameBox)
+cns.Color = Color3.fromRGB(80, 60, 120); cns.Thickness = 1
+yC = yC + 28
+
+-- Save button
+local btnSave = Instance.new("TextButton")
+btnSave.Size = UDim2.new(1, -16, 0, 24)
+btnSave.Position = UDim2.new(0, 8, 0, yC)
+btnSave.BackgroundColor3 = Color3.fromRGB(40, 130, 70)
+btnSave.BorderSizePixel = 0
+btnSave.Text = "💾  Save Config"
+btnSave.TextColor3 = WHITE
+btnSave.TextSize = 10
+btnSave.Font = Enum.Font.GothamBold
+btnSave.Parent = PanelConfig
+Instance.new("UICorner", btnSave).CornerRadius = UDim.new(0, 6)
+yC = yC + 30
+
+-- Divider
+local cd2 = Instance.new("Frame")
+cd2.Size = UDim2.new(0.9, 0, 0, 1)
+cd2.Position = UDim2.new(0.05, 0, 0, yC)
+cd2.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+cd2.BorderSizePixel = 0
+cd2.Parent = PanelConfig
+yC = yC + 6
+
+makeCLabel("Saved configs:", yC, DIM, 8)
+yC = yC + 14
+
+-- Config list (scrollable)
+local configList = Instance.new("ScrollingFrame")
+configList.Size = UDim2.new(1, -16, 0, 100)
+configList.Position = UDim2.new(0, 8, 0, yC)
+configList.BackgroundColor3 = Color3.fromRGB(14, 12, 20)
+configList.BackgroundTransparency = 0.3
+configList.BorderSizePixel = 0
+configList.ScrollBarThickness = 2
+configList.ScrollBarImageColor3 = PURPLE
+configList.CanvasSize = UDim2.new(0, 0, 0, 0)
+configList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+configList.ScrollingDirection = Enum.ScrollingDirection.Y
+configList.Parent = PanelConfig
+Instance.new("UICorner", configList).CornerRadius = UDim.new(0, 6)
+local cls = Instance.new("UIStroke", configList)
+cls.Color = Color3.fromRGB(60, 45, 90); cls.Thickness = 1
+local configListLayout = Instance.new("UIListLayout", configList)
+configListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+configListLayout.Padding = UDim.new(0, 2)
+yC = yC + 106
+
+-- Load / Delete buttons
+local btnLoad = Instance.new("TextButton")
+btnLoad.Size = UDim2.new(0.5, -10, 0, 24)
+btnLoad.Position = UDim2.new(0, 8, 0, yC)
+btnLoad.BackgroundColor3 = Color3.fromRGB(30, 80, 160)
+btnLoad.BorderSizePixel = 0
+btnLoad.Text = "📂  Load"
+btnLoad.TextColor3 = WHITE
+btnLoad.TextSize = 10
+btnLoad.Font = Enum.Font.GothamBold
+btnLoad.Parent = PanelConfig
+Instance.new("UICorner", btnLoad).CornerRadius = UDim.new(0, 6)
+
+local btnDelete = Instance.new("TextButton")
+btnDelete.Size = UDim2.new(0.5, -10, 0, 24)
+btnDelete.Position = UDim2.new(0.5, 2, 0, yC)
+btnDelete.BackgroundColor3 = Color3.fromRGB(140, 30, 40)
+btnDelete.BorderSizePixel = 0
+btnDelete.Text = "🗑  Delete"
+btnDelete.TextColor3 = WHITE
+btnDelete.TextSize = 10
+btnDelete.Font = Enum.Font.GothamBold
+btnDelete.Parent = PanelConfig
+Instance.new("UICorner", btnDelete).CornerRadius = UDim.new(0, 6)
+yC = yC + 30
+
+-- Auto load button
+local btnAutoLoad = Instance.new("TextButton")
+btnAutoLoad.Size = UDim2.new(1, -16, 0, 24)
+btnAutoLoad.Position = UDim2.new(0, 8, 0, yC)
+btnAutoLoad.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+btnAutoLoad.BorderSizePixel = 0
+btnAutoLoad.Text = "⚡  Set Auto Load: None"
+btnAutoLoad.TextColor3 = Color3.fromRGB(255, 210, 80)
+btnAutoLoad.TextSize = 10
+btnAutoLoad.Font = Enum.Font.GothamBold
+btnAutoLoad.Parent = PanelConfig
+Instance.new("UICorner", btnAutoLoad).CornerRadius = UDim.new(0, 6)
+yC = yC + 30
+
+-- Status label
+local configStatus = Instance.new("TextLabel")
+configStatus.Size = UDim2.new(1, -16, 0, 14)
+configStatus.Position = UDim2.new(0, 8, 0, yC)
+configStatus.BackgroundTransparency = 1
+configStatus.Text = ""
+configStatus.TextColor3 = GREEN
+configStatus.TextSize = 9
+configStatus.Font = Enum.Font.Gotham
+configStatus.TextXAlignment = Enum.TextXAlignment.Center
+configStatus.Parent = PanelConfig
+yC = yC + 18
+
+PanelConfig.CanvasSize = UDim2.new(0, 0, 0, yC + 4)
+
+-- ─── Resize Main ─────────────────────────────────────────────────────────────
+local contentH = math.max(yF, yC) + 4
 local fullH = math.min(PAD_TOP + contentH, MAX_H)
-Main.Size = UDim2.new(0, 220, 0, fullH)
+Main.Size = UDim2.new(0, 256, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
--- Popup
-local POPUP_W      = 190
+-- ─── Tab Switch Logic ────────────────────────────────────────────────────────
+local activeTab = "farm"
+
+local function switchTab(tab)
+    activeTab = tab
+    PanelFarm.Visible   = (tab == "farm")
+    PanelConfig.Visible = (tab == "config")
+
+    if tab == "farm" then
+        TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, 13)}):Play()
+        TabFarm.TextColor3   = WHITE
+        TabConfig.TextColor3 = DIM
+        TweenService:Create(TabFarm,   tweenInfo, {BackgroundTransparency = 0.6}):Play()
+        TweenService:Create(TabConfig, tweenInfo, {BackgroundTransparency = 1}):Play()
+    else
+        TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0, 0, 0, 55)}):Play()
+        TabFarm.TextColor3   = DIM
+        TabConfig.TextColor3 = WHITE
+        TweenService:Create(TabFarm,   tweenInfo, {BackgroundTransparency = 1}):Play()
+        TweenService:Create(TabConfig, tweenInfo, {BackgroundTransparency = 0.6}):Play()
+    end
+end
+
+TabFarm.MouseButton1Click:Connect(function() switchTab("farm") end)
+TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
+switchTab("farm")  -- default
+
+-- ─── Popup ───────────────────────────────────────────────────────────────────
+local POPUP_W = 200
 local POPUP_ITEM_H = 20
-local POPUP_H      = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
+local POPUP_H = 30 + (#areas * (POPUP_ITEM_H + 2)) + 40
 
 local Backdrop = Instance.new("TextButton")
 Backdrop.Size = UDim2.new(1, 0, 1, 0)
@@ -526,8 +772,7 @@ Popup.Visible = false
 Popup.Parent = ScreenGui
 Instance.new("UICorner", Popup).CornerRadius = UDim.new(0, 12)
 local PopupStroke = Instance.new("UIStroke", Popup)
-PopupStroke.Color = Color3.fromRGB(80, 60, 120)
-PopupStroke.Thickness = 1
+PopupStroke.Color = Color3.fromRGB(80, 60, 120); PopupStroke.Thickness = 1
 
 local PopupTitle = Instance.new("TextLabel")
 PopupTitle.Size = UDim2.new(1, -20, 0, 28)
@@ -642,9 +887,20 @@ SetBtn.ZIndex = 12
 SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0, 6)
 
-local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+-- ─── Toggle Helper ───────────────────────────────────────────────────────────
+local function setToggle(pill, dot, stroke, on)
+    if on then
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
+    else
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
+    end
+end
 
--- Status update
+-- ─── Status Update ───────────────────────────────────────────────────────────
 local function updateStatus()
     local serverArea = player:GetAttribute("CurrentArea") or ""
     StatusLabel.Text = "Area: " .. (serverArea ~= "" and serverArea or "—")
@@ -655,22 +911,21 @@ local function updateStatus()
         RebirthTargetLabel.Text = "Rebirth at: " .. formatNum(rebirthAt)
         WarnLabel.Text          = getAura() >= rebirthAt and "⚠ Sedia untuk rebirth!" or ""
     else
-        TargetVal.Text          = "—"
-        ReqLabel.Text           = "Target req: —"
+        TargetVal.Text = "—"
+        ReqLabel.Text = "Target req: —"
         RebirthTargetLabel.Text = "Rebirth at: —"
-        WarnLabel.Text          = ""
+        WarnLabel.Text = ""
     end
 end
 
--- Popup logic
+-- ─── Popup Logic ─────────────────────────────────────────────────────────────
 local function refreshPopupItems()
     for i, item in ipairs(popupItems) do
-        local isSel     = selectedInPopup == i
+        local isSel = selectedInPopup == i
         local isCurrent = comboTarget and comboTarget.name == item.area.name
         item.frame.BackgroundTransparency = isSel and 0 or 1
         item.frame.BackgroundColor3 = isSel and Color3.fromRGB(50,35,80) or Color3.fromRGB(25,20,38)
         item.dot.BackgroundColor3 = isSel and PURPLE or DIM
-        item.nameLbl.TextColor3 = WHITE
         item.checkLbl.Text = isCurrent and "✓" or ""
     end
 end
@@ -695,8 +950,7 @@ end
 
 for i, item in ipairs(popupItems) do
     item.hitbox.MouseButton1Click:Connect(function()
-        selectedInPopup = i
-        refreshPopupItems()
+        selectedInPopup = i; refreshPopupItems()
     end)
 end
 
@@ -704,267 +958,63 @@ CancelBtn.MouseButton1Click:Connect(closePopup)
 Backdrop.MouseButton1Click:Connect(closePopup)
 TargetBtn.MouseButton1Click:Connect(openPopup)
 
-SetBtn.MouseButton1Click:Connect(function()
-    if not selectedInPopup then closePopup(); return end
-    comboTarget = areas[selectedInPopup]
-    updateStatus()
-    closePopup()
-    autoSave()
-end)
-
--- Toggle helper
-local function setToggle(pill, dot, stroke, on)
-    if on then
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
-    else
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
-    end
-end
-
--- Threshold logic
-local function applyThreshold(val)
-    local n = tonumber(val)
-    if n and n > 0 then threshold = math.max(0.1, n) end
-    ThreshBox.Text = formatThresh(threshold)
-    updateStatus()
-end
-
-ThreshMinus.MouseButton1Click:Connect(function()
-    threshold = math.max(0.1, math.floor((threshold - 0.1) * 10 + 0.5) / 10)
-    ThreshBox.Text = formatThresh(threshold)
-    updateStatus()
-end)
-ThreshPlus.MouseButton1Click:Connect(function()
-    threshold = math.floor((threshold + 0.1) * 10 + 0.5) / 10
-    ThreshBox.Text = formatThresh(threshold)
-    updateStatus()
-end)
--- ThreshBox is TextLabel, FocusLost removed
-
--- Multiplier logic
-local function applyMultiplier(val)
-    local n = tonumber(val)
-    if n and n > 0 then multiplier = math.max(0.1, n) end
-    MultBox.Text = formatThresh(multiplier)
-end
-
-MultMinus.MouseButton1Click:Connect(function()
-    multiplier = math.max(0.1, math.floor((multiplier - 0.1) * 10 + 0.5) / 10)
-    MultBox.Text = formatThresh(multiplier)
-    autoSave()
-end)
-MultPlus.MouseButton1Click:Connect(function()
-    multiplier = math.floor((multiplier + 0.1) * 10 + 0.5) / 10
-    MultBox.Text = formatThresh(multiplier)
-    autoSave()
-end)
-MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
-MultHitbox.MouseButton1Click:Connect(function()
-    multiplierOn = not multiplierOn
-    setToggle(MultPill, MultDot, MultStroke, multiplierOn)
-    autoSave()
-end)
-
--- Minimize
-local minimized = false
-MinBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,220,0,38)}):Play()
-        Content.Visible = false; MinBtn.Text = "□"
-    else
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,220,0,fullH)}):Play()
-        Content.Visible = true; MinBtn.Text = "—"
-    end
-end)
-
--- Close
-CloseBtn.MouseButton1Click:Connect(function()
-    autoTraining = false; autoRebirth = false; autoCombo = false; zoneGuard = false
-    ScreenGui:Destroy()
-end)
-
--- Toggle events
-TrainBtn.MouseButton1Click:Connect(function()
-    autoTraining = not autoTraining
-    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
-    if not autoTraining then currentArea = nil end
-    autoSave()
-end)
-
-RebirthBtn.MouseButton1Click:Connect(function()
-    autoRebirth = not autoRebirth
-    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
-    autoSave()
-end)
-
-ComboBtn.MouseButton1Click:Connect(function()
-    autoCombo = not autoCombo
-    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
-    if not autoCombo then currentArea = nil end
-    autoSave()
-end)
-
-ZoneBtn.MouseButton1Click:Connect(function()
-    zoneGuard = not zoneGuard
-    setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard)
-    autoSave()
-end)
-
--- Respawn
-player.CharacterAdded:Connect(function()
-    task.wait(3)
-    if autoTraining or autoCombo or zoneGuard then
-        local best = getBestArea(getAura())
-        if best then
-            teleport(best.pos)
-            currentArea = best.name
-        end
-    end
-end)
-
--- Status update loop
-task.spawn(function()
-    while true do
-        updateStatus()
-        task.wait(2)
-    end
-end)
-
--- Auto Training loop
-task.spawn(function()
-    while true do
-        if (autoTraining or autoCombo) and not isRebirthing then
-            local aura = getAura()
-            local best = getBestArea(aura)
-            if best and best.name ~= currentArea then
-                currentArea = best.name
-                teleport(best.pos)
-            end
-        end
-        task.wait(5)
-    end
-end)
-
--- Auto Rebirth loop
-task.spawn(function()
-    while true do
-        if autoRebirth and not isRebirthing then
-            RequestRebirth:InvokeServer()
-            rebirthCount += 1
-            RebirthLabel.Text = "Rebirths: " .. rebirthCount
-            task.wait(0.1)
-        else
-            task.wait(0.1)
-        end
-    end
-end)
-
--- Combo loop
-task.spawn(function()
-    while true do
-        if autoCombo and comboTarget then
-            local aura      = getAura()
-            local rebirthAt = comboTarget.req * threshold
-            if aura >= rebirthAt then
-                isRebirthing = true
-                RequestRebirth:InvokeServer()
-                rebirthCount += 1
-                RebirthLabel.Text = "Rebirths: " .. rebirthCount
-                if multiplierOn then
-                    threshold = threshold * multiplier
-                    ThreshBox.Text = formatThresh(threshold)
-                end
-                task.wait(2)
-                isRebirthing = false
-                currentArea = nil
-                local curIdx = getAreaIndex(comboTarget)
-                if curIdx < #areas then
-                    comboTarget = areas[curIdx + 1]
-                end
-                updateStatus()
-            end
-        end
-        task.wait(1)
-    end
-end)
-
--- Zone Guard loop
-task.spawn(function()
-    while true do
-        if zoneGuard and not isRebirthing then
-            local serverArea = player:GetAttribute("CurrentArea") or ""
-            if serverArea == "" then
-                local best = getBestArea(getAura())
-                if best then
-                    teleport(best.pos)
-                    currentArea = best.name
-                end
-            end
-        end
-        task.wait(3)
-    end
-end)
-
-
 -- ─── CONFIG SYSTEM ───────────────────────────────────────────────────────────
-local CONFIG_FILE = "autohub_config.json"
-local hasFS = false
+local CONFIG_FILE   = "autohub_config.json"
+local AUTOLOAD_KEY  = "__autoload__"
+local hasFS         = false
+local selectedCfg   = nil
+
 pcall(function()
-    hasFS = type(isfolder) == "function"
-        and type(writefile) == "function"
-        and type(readfile) == "function"
+    hasFS = type(writefile) == "function" and type(readfile) == "function"
 end)
+
+local function setConfigStatus(msg, isErr)
+    configStatus.Text = msg
+    configStatus.TextColor3 = isErr and RED or GREEN
+    task.delay(3, function() if configStatus.Text == msg then configStatus.Text = "" end end)
+end
+
+local function loadConfigFile()
+    if not hasFS then return {} end
+    local ok, data = pcall(readfile, CONFIG_FILE)
+    if not ok or not data or data == "" then return {} end
+    local ok2, t = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
+    return (ok2 and t) or {}
+end
+
+local function saveConfigFile(configs)
+    if not hasFS then setConfigStatus("⚠ Executor tak support file save!", true); return end
+    pcall(function()
+        writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(configs))
+    end)
+end
 
 local function getCurrentSettings()
     return {
-        autoTraining  = autoTraining,
-        autoRebirth   = autoRebirth,
-        autoCombo     = autoCombo,
-        zoneGuard     = zoneGuard,
-        multiplierOn  = multiplierOn,
-        threshold     = threshold,
-        multiplier    = multiplier,
+        autoTraining    = autoTraining,
+        autoRebirth     = autoRebirth,
+        autoCombo       = autoCombo,
+        zoneGuard       = zoneGuard,
+        multiplierOn    = multiplierOn,
+        threshold       = threshold,
+        multiplier      = multiplier,
         comboTargetName = comboTarget and comboTarget.name or nil,
     }
 end
 
-local function saveConfig()
-    if not hasFS then return end
-    local ok, err = pcall(function()
-        local data = game:GetService("HttpService"):JSONEncode(getCurrentSettings())
-        writefile(CONFIG_FILE, data)
-    end)
-end
-
-local function applyConfig(s)
+local function applySettings(s)
     if not s then return end
-
-    -- Restore values
-    if s.threshold   then threshold  = s.threshold  end
-    if s.multiplier  then multiplier = s.multiplier end
-
-    -- Restore comboTarget
+    if s.threshold  then threshold  = s.threshold  end
+    if s.multiplier then multiplier = s.multiplier end
     if s.comboTargetName then
-        for _, a in ipairs(areas) do
-            if a.name == s.comboTargetName then
-                comboTarget = a
-                break
-            end
+        for _,a in ipairs(areas) do
+            if a.name == s.comboTargetName then comboTarget = a; break end
         end
     end
-
-    -- Restore multiplier toggle
     if s.multiplierOn ~= nil then
         multiplierOn = s.multiplierOn
         setToggle(MultPill, MultDot, MultStroke, multiplierOn)
     end
-
-    -- Restore toggles (variables only, loops already running)
     if s.autoTraining ~= nil then
         autoTraining = s.autoTraining
         setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
@@ -981,35 +1031,294 @@ local function applyConfig(s)
         zoneGuard = s.zoneGuard
         setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard)
     end
-
-    -- Update UI display
     ThreshBox.Text = formatThresh(threshold)
     MultBox.Text   = formatThresh(multiplier)
     updateStatus()
 end
 
-local function loadConfig()
-    if not hasFS then return end
-    local ok, data = pcall(readfile, CONFIG_FILE)
-    if not ok or not data or data == "" then return end
-    local ok2, s = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(data)
+local function autoSave()
+    task.spawn(function()
+        task.wait(0.5)
+        local configs = loadConfigFile()
+        if selectedCfg and configs[selectedCfg] then
+            configs[selectedCfg] = getCurrentSettings()
+            saveConfigFile(configs)
+        end
     end)
-    if ok2 and s then
-        applyConfig(s)
-        print("Auto Hub: Config loaded!")
+end
+
+-- Rebuild config list UI
+local function rebuildConfigList()
+    for _, c in pairs(configList:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    local configs = loadConfigFile()
+    local autoLoadName = configs[AUTOLOAD_KEY]
+    btnAutoLoad.Text = autoLoadName and ("⚡  Auto Load: "..autoLoadName) or "⚡  Set Auto Load: None"
+    btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20, 100, 30) or Color3.fromRGB(60, 40, 10)
+
+    local hasAny = false
+    for name, _ in pairs(configs) do
+        if name == AUTOLOAD_KEY then continue end
+        hasAny = true
+        local isAuto = autoLoadName == name
+        local isSel  = selectedCfg == name
+        local item = Instance.new("TextButton")
+        item.Size = UDim2.new(1, 0, 0, 22)
+        item.BackgroundColor3 = isSel and Color3.fromRGB(60, 40, 100) or Color3.fromRGB(25, 20, 38)
+        item.BackgroundTransparency = isSel and 0 or 0.3
+        item.BorderSizePixel = 0
+        item.Text = (isAuto and "⚡ " or "  ") .. name
+        item.TextColor3 = isSel and WHITE or (isAuto and GREEN or DIM)
+        item.TextSize = 10
+        item.Font = Enum.Font.Gotham
+        item.TextXAlignment = Enum.TextXAlignment.Left
+        item.Parent = configList
+        Instance.new("UICorner", item).CornerRadius = UDim.new(0, 4)
+        item.MouseButton1Click:Connect(function()
+            selectedCfg = name
+            rebuildConfigList()
+        end)
+    end
+    if not hasAny then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 22)
+        empty.BackgroundTransparency = 1
+        empty.Text = "  No configs saved"
+        empty.TextColor3 = DIM
+        empty.TextSize = 9
+        empty.Font = Enum.Font.Gotham
+        empty.TextXAlignment = Enum.TextXAlignment.Left
+        empty.Parent = configList
     end
 end
 
--- Auto-save bila mana-mana toggle atau value berubah
-local function autoSave()
-    task.spawn(function()
-        task.wait(0.5) -- debounce
-        saveConfig()
-    end)
+-- Config buttons
+btnSave.MouseButton1Click:Connect(function()
+    if not hasFS then setConfigStatus("⚠ Executor tak support!", true); return end
+    local name = configNameBox.Text:gsub("%s+", "")
+    if name == "" then setConfigStatus("⚠ Enter config name!", true); return end
+    local configs = loadConfigFile()
+    local count = 0
+    for k,_ in pairs(configs) do if k ~= AUTOLOAD_KEY then count += 1 end end
+    if count >= 10 and not configs[name] then setConfigStatus("⚠ Max 10 configs!", true); return end
+    configs[name] = getCurrentSettings()
+    saveConfigFile(configs)
+    selectedCfg = name
+    configNameBox.Text = ""
+    setConfigStatus("✓ Saved: " .. name)
+    rebuildConfigList()
+end)
+
+btnLoad.MouseButton1Click:Connect(function()
+    if not selectedCfg then setConfigStatus("⚠ Select a config first!", true); return end
+    local configs = loadConfigFile()
+    if configs[selectedCfg] then
+        applySettings(configs[selectedCfg])
+        setConfigStatus("✓ Loaded: " .. selectedCfg)
+    else
+        setConfigStatus("⚠ Config not found!", true)
+    end
+end)
+
+btnDelete.MouseButton1Click:Connect(function()
+    if not selectedCfg then setConfigStatus("⚠ Select a config first!", true); return end
+    local configs = loadConfigFile()
+    if configs[selectedCfg] then
+        local deleted = selectedCfg
+        configs[selectedCfg] = nil
+        if configs[AUTOLOAD_KEY] == selectedCfg then configs[AUTOLOAD_KEY] = nil end
+        saveConfigFile(configs)
+        selectedCfg = nil
+        setConfigStatus("🗑 Deleted: " .. deleted)
+        rebuildConfigList()
+    end
+end)
+
+btnAutoLoad.MouseButton1Click:Connect(function()
+    if not selectedCfg then setConfigStatus("⚠ Select a config first!", true); return end
+    local configs = loadConfigFile()
+    if configs[AUTOLOAD_KEY] == selectedCfg then
+        configs[AUTOLOAD_KEY] = nil
+        setConfigStatus("⚡ Auto load removed")
+    else
+        configs[AUTOLOAD_KEY] = selectedCfg
+        setConfigStatus("⚡ Auto load set: " .. selectedCfg)
+    end
+    saveConfigFile(configs)
+    rebuildConfigList()
+end)
+
+-- ─── Threshold Logic ─────────────────────────────────────────────────────────
+local function applyThreshold(val)
+    local n = tonumber(val)
+    if n and n > 0 then threshold = math.max(0.1, n) end
+    ThreshBox.Text = formatThresh(threshold)
+    updateStatus(); autoSave()
 end
 
--- Init
+ThreshMinus.MouseButton1Click:Connect(function()
+    threshold = math.max(0.1, math.floor((threshold - 0.1) * 10 + 0.5) / 10)
+    ThreshBox.Text = formatThresh(threshold)
+    updateStatus(); autoSave()
+end)
+ThreshPlus.MouseButton1Click:Connect(function()
+    threshold = math.floor((threshold + 0.1) * 10 + 0.5) / 10
+    ThreshBox.Text = formatThresh(threshold)
+    updateStatus(); autoSave()
+end)
+ThreshBox.FocusLost:Connect(function() applyThreshold(ThreshBox.Text) end)
+
+-- ─── Multiplier Logic ────────────────────────────────────────────────────────
+local function applyMultiplier(val)
+    local n = tonumber(val)
+    if n and n > 0 then multiplier = math.max(0.1, n) end
+    MultBox.Text = formatThresh(multiplier); autoSave()
+end
+
+MultMinus.MouseButton1Click:Connect(function()
+    multiplier = math.max(0.1, math.floor((multiplier - 0.1) * 10 + 0.5) / 10)
+    MultBox.Text = formatThresh(multiplier); autoSave()
+end)
+MultPlus.MouseButton1Click:Connect(function()
+    multiplier = math.floor((multiplier + 0.1) * 10 + 0.5) / 10
+    MultBox.Text = formatThresh(multiplier); autoSave()
+end)
+MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
+MultHitbox.MouseButton1Click:Connect(function()
+    multiplierOn = not multiplierOn
+    setToggle(MultPill, MultDot, MultStroke, multiplierOn); autoSave()
+end)
+
+-- ─── SetBtn (popup) ──────────────────────────────────────────────────────────
+SetBtn.MouseButton1Click:Connect(function()
+    if not selectedInPopup then closePopup(); return end
+    comboTarget = areas[selectedInPopup]
+    updateStatus(); closePopup(); autoSave()
+end)
+
+-- ─── Minimize / Close ────────────────────────────────────────────────────────
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,256,0,38)}):Play()
+        ContentArea.Visible = false; TabBar.Visible = false; TabDiv.Visible = false
+        MinBtn.Text = "□"
+    else
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,256,0,fullH)}):Play()
+        ContentArea.Visible = true; TabBar.Visible = true; TabDiv.Visible = true
+        MinBtn.Text = "—"
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    autoTraining = false; autoRebirth = false; autoCombo = false; zoneGuard = false
+    ScreenGui:Destroy()
+end)
+
+-- ─── Toggle Events ───────────────────────────────────────────────────────────
+TrainBtn.MouseButton1Click:Connect(function()
+    autoTraining = not autoTraining
+    setToggle(TrainPill, TrainDot, TrainStroke, autoTraining)
+    if not autoTraining then currentArea = nil end
+    autoSave()
+end)
+RebirthBtn.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)
+    autoSave()
+end)
+ComboBtn.MouseButton1Click:Connect(function()
+    autoCombo = not autoCombo
+    setToggle(ComboPill, ComboDot, ComboStroke, autoCombo)
+    if not autoCombo then currentArea = nil end
+    autoSave()
+end)
+ZoneBtn.MouseButton1Click:Connect(function()
+    zoneGuard = not zoneGuard
+    setToggle(ZonePill, ZoneDot, ZoneStroke, zoneGuard)
+    autoSave()
+end)
+
+-- ─── Respawn ─────────────────────────────────────────────────────────────────
+player.CharacterAdded:Connect(function()
+    task.wait(3)
+    if autoTraining or autoCombo or zoneGuard then
+        local best = getBestArea(getAura())
+        if best then teleport(best.pos); currentArea = best.name end
+    end
+end)
+
+-- ─── Loops ───────────────────────────────────────────────────────────────────
+task.spawn(function()
+    while true do updateStatus(); task.wait(2) end
+end)
+
+task.spawn(function()
+    while true do
+        if (autoTraining or autoCombo) and not isRebirthing then
+            local aura = getAura()
+            local best = getBestArea(aura)
+            if best and best.name ~= currentArea then
+                currentArea = best.name; teleport(best.pos)
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if autoRebirth and not isRebirthing then
+            RequestRebirth:InvokeServer()
+            rebirthCount += 1
+            RebirthLabel.Text = "Rebirths: " .. rebirthCount
+            task.wait(0.1)
+        else task.wait(0.1) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if autoCombo and comboTarget then
+            local aura = getAura()
+            local rebirthAt = comboTarget.req * threshold
+            if aura >= rebirthAt then
+                isRebirthing = true
+                RequestRebirth:InvokeServer()
+                rebirthCount += 1
+                RebirthLabel.Text = "Rebirths: " .. rebirthCount
+                if multiplierOn then
+                    threshold = threshold * multiplier
+                    ThreshBox.Text = formatThresh(threshold)
+                end
+                task.wait(2)
+                isRebirthing = false
+                currentArea = nil
+                local curIdx = getAreaIndex(comboTarget)
+                if curIdx < #areas then comboTarget = areas[curIdx + 1] end
+                updateStatus()
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if zoneGuard and not isRebirthing then
+            local serverArea = player:GetAttribute("CurrentArea") or ""
+            if serverArea == "" then
+                local best = getBestArea(getAura())
+                if best then teleport(best.pos); currentArea = best.name end
+            end
+        end
+        task.wait(3)
+    end
+end)
+
+-- ─── Init ────────────────────────────────────────────────────────────────────
 local function initDefaultTarget()
     local next = getNextArea(getAura())
     comboTarget = next or areas[#areas]
@@ -1017,5 +1326,22 @@ local function initDefaultTarget()
 end
 
 initDefaultTarget()
-loadConfig()  -- Auto load saved config on execute
+
+-- Auto load saved config on execute
+task.spawn(function()
+    task.wait(0.5)  -- wait for UI ready
+    local configs = loadConfigFile()
+    if configs and configs[AUTOLOAD_KEY] then
+        local autoName = configs[AUTOLOAD_KEY]
+        if configs[autoName] then
+            applySettings(configs[autoName])
+            selectedCfg = autoName
+            setConfigStatus("⚡ Auto loaded: " .. autoName)
+            rebuildConfigList()
+        end
+    else
+        rebuildConfigList()
+    end
+end)
+
 print("Auto Hub v3 loaded!")
