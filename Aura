@@ -1538,6 +1538,10 @@ task.spawn(function()
 end)
 
 -- ─── Kick / Disconnect Detection ─────────────────────────────────────────────
+local TeleportService = game:GetService("TeleportService")
+local placeId = game.PlaceId
+
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
 
 game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.RequestedFromServer then
