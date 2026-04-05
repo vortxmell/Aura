@@ -1284,7 +1284,7 @@ end)
 task.spawn(function()
     while true do
         if autoRebirth and not isRebirthing then
-            RequestRebirth:InvokeServer()
+            if RequestRebirth then RequestRebirth:InvokeServer() end
             rebirthCount += 1
             RebirthLabel.Text = "Rebirths: " .. rebirthCount
             task.wait(0.1)
@@ -1299,7 +1299,7 @@ task.spawn(function()
             local rebirthAt = comboTarget.req * threshold
             if aura >= rebirthAt then
                 isRebirthing = true
-                RequestRebirth:InvokeServer()
+                if RequestRebirth then RequestRebirth:InvokeServer() end
                 rebirthCount += 1
                 RebirthLabel.Text = "Rebirths: " .. rebirthCount
                 if multiplierOn then
