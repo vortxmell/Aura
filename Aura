@@ -700,6 +700,7 @@ makeKDiv()
 makeKSection("AUTO REBIRTH (KOTH)")
 
 -- Toggle row
+local kRebRowY = yK  -- capture position DULU sebelum yK berubah
 local kRebRow = Instance.new("Frame")
 kRebRow.Size = UDim2.new(1,-10,0,ROW_H); kRebRow.Position = UDim2.new(0,5,0,yK)
 kRebRow.BackgroundColor3 = PANEL; kRebRow.BorderSizePixel = 0; kRebRow.Parent = PanelKOTH
@@ -721,7 +722,7 @@ kRebDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebDot.BorderSizePixel =
 Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
 -- FIX: Hitbox parent kat PanelKOTH bukan kRebRow, position sama tapi ZIndex lebih tinggi supaya tak di-overlap kRebInputRow
 local kRebHitbox = Instance.new("TextButton")
-kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,yK)
+kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,kRebRowY)
 kRebHitbox.BackgroundTransparency = 1; kRebHitbox.ZIndex = 3
 kRebHitbox.Text = ""; kRebHitbox.Parent = PanelKOTH
 yK = yK + ROW_H + GAP
