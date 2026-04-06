@@ -1358,15 +1358,20 @@ local function applySettings(s)
     if s.autoRebirth     ~= nil then autoRebirth     = s.autoRebirth;     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)     end
     if s.autoCombo       ~= nil then autoCombo       = s.autoCombo;       setToggle(ComboPill,   ComboDot,   ComboStroke,   autoCombo)       end
     if s.zoneGuard       ~= nil then zoneGuard       = s.zoneGuard;       setToggle(ZonePill,    ZoneDot,    ZoneStroke,    zoneGuard)       end
-    if s.autoKOTH        ~= nil then
-        autoKOTH = s.autoKOTH
+    if s.autoKOTH ~= nil then
+    autoKOTH = s.autoKOTH
+    if kAutoPill and kAutoDot and kAutoStroke then
         setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
         kAutoStatus.Text = autoKOTH and "🔄 Running..." or "💤 Idle"
         kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
     end
-    if s.autoServerHop ~= nil then
-        autoServerHop = s.autoServerHop
+end
+if s.autoServerHop ~= nil then
+    autoServerHop = s.autoServerHop
+    if kHopPill and kHopDot and kHopStroke then
         setToggle(kHopPill, kHopDot, kHopStroke, autoServerHop)
+    end
+end
     end
     if s.autoKothRebirth ~= nil then
         autoKothRebirth = s.autoKothRebirth
