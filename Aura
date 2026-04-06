@@ -721,10 +721,11 @@ kRebDot.Size = UDim2.new(0,10,0,10); kRebDot.Position = UDim2.new(0,2,0.5,-5)
 kRebDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebDot.BorderSizePixel = 0; kRebDot.Parent = kRebPill
 Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
 -- FIX: Hitbox parent kat PanelKOTH bukan kRebRow, position sama tapi ZIndex lebih tinggi supaya tak di-overlap kRebInputRow
+-- BARU (hitbox dalam kRebRow, sama macam semua toggle lain):
 local kRebHitbox = Instance.new("TextButton")
-kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,kRebRowY)
-kRebHitbox.BackgroundTransparency = 1; kRebHitbox.ZIndex = 3
-kRebHitbox.Text = ""; kRebHitbox.Parent = PanelKOTH
+kRebHitbox.Size = UDim2.new(1,0,1,0)
+kRebHitbox.BackgroundTransparency = 1
+kRebHitbox.Text = ""; kRebHitbox.Parent = kRebRow
 yK = yK + ROW_H + GAP
 
 -- Input row: value + unit dropdown
