@@ -950,6 +950,30 @@ end)
 
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
 
+task.spawn(function()
+    task.wait(3)
+    -- Check semua GuiObject yang overlap dengan kRebRow
+    local absPos = kRebRow.AbsolutePosition
+    local absSize = kRebRow.AbsoluteSize
+    print("[OVERLAP] kRebRow pos:", absPos, "size:", absSize)
+    for _, v in ipairs(ScreenGui:GetDescendants()) do
+        if v:IsA("TextButton") and v ~= kRebHitbox then
+            local vPos = v.AbsolutePosition
+            local vSize = v.AbsoluteSize
+            -- Check kalau overlap
+            if vPos.X < absPos.X + absSize.X and
+               vPos.X + vSize.X > absPos.X and
+               vPos.Y < absPos.Y + absSize.Y and
+               vPos.Y + vSize.Y > absPos.Y then
+                print("[OVERLAP] FOUND:", v.Name, 
+                    "ZIndex:", v.ZIndex,
+                    "Parent:", v.Parent.Name,
+                    "pos:", vPos, "size:", vSize)
+            end
+        end
+    end
+end)
+
 -- Letak lepas PanelKOTH.CanvasSize line
 task.spawn(function()
     task.wait(2)
