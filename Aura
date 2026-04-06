@@ -279,9 +279,9 @@ local function makePanel()
     return f
 end
 
-local PanelFarm   = makePanel()
+local PanelFarm   = makePanel(); PanelFarm.Visible   = false
 local PanelConfig = makePanel(); PanelConfig.Visible = false
-local PanelKOTH   = makePanel(); PanelKOTH.Visible   = false
+local PanelKOTH   = makePanel()
 
 -- --- Vertical divider helper for panels ---
 local function makeVDiv(panel)
@@ -1012,7 +1012,7 @@ end
 -- ============================================================
 -- TAB SWITCH
 -- ============================================================
-local activeTab = "farm"
+local activeTab = "koth"
 local function switchTab(tab)
     activeTab = tab
     PanelFarm.Visible   = (tab == "farm")
@@ -1031,7 +1031,7 @@ end
 TabFarm.MouseButton1Click:Connect(function()   switchTab("farm")   end)
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
 TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
-switchTab("farm")
+switchTab("koth")
 
 -- ============================================================
 -- POPUP (Rebirth Target selector) - unchanged logic
