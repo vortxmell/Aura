@@ -930,20 +930,6 @@ kRebHitbox.MouseButton1Click:Connect(function()
     updateKRebTarget()
 end)
 
--- Letak lepas PanelKOTH.CanvasSize line
-task.spawn(function()
-    task.wait(2)
-    for _, v in ipairs(PanelKOTH:GetDescendants()) do
-        if v:IsA("TextButton") then
-            print("[SCAN] TextButton:", v.Name, 
-                "| Pos:", v.AbsolutePosition, 
-                "| Size:", v.AbsoluteSize,
-                "| ZIndex:", v.ZIndex,
-                "| Parent:", v.Parent.Name)
-        end
-    end
-end)
-
 -- Loop auto rebirth KOTH
 task.spawn(function()
     while true do
@@ -963,6 +949,20 @@ task.spawn(function()
 end)
 
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
+
+-- Letak lepas PanelKOTH.CanvasSize line
+task.spawn(function()
+    task.wait(2)
+    for _, v in ipairs(PanelKOTH:GetDescendants()) do
+        if v:IsA("TextButton") then
+            print("[SCAN] TextButton:", v.Name, 
+                "| Pos:", v.AbsolutePosition, 
+                "| Size:", v.AbsoluteSize,
+                "| ZIndex:", v.ZIndex,
+                "| Parent:", v.Parent.Name)
+        end
+    end
+end)
 
 -- --- KOTH Logic (Hitbox Polling) ---
 local kothHitbox = nil
