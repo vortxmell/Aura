@@ -1541,11 +1541,21 @@ local function hopToLeastPopulated(reason)
 end
 
 -- ============================================================
--- AUTO KOTH LOOP - with autoServerHop check
+-- AUTO KOTH LOOP - dynamic KOTH position scan
 -- ============================================================
 task.spawn(function()
-    local KOTH_POS = Vector3.new(-190, 54, 127)
     local wasHolding = false
+
+    local function getKOTHPos()
+        -- Scan live coordinate dari AreaHitbox setiap kali
+        local ok2, hitbox = pcall(function()
+            return workspace:WaitForChild("KOTH", 5):WaitForChild("AreaHitbox", 5)
+        end)
+        if ok2 and hitbox then
+            return hitbox.Position + Vector3.new(0, 3, 0)  -- sikit offset elak void tepi hitbox
+        end
+        return nil
+    end
 
     while ScreenGui.Parent do
         if forceHop then
@@ -1576,6 +1586,8 @@ task.spawn(function()
                     kAutoStatus.TextColor3 = WHITE
                 end
             else
+                local KOTH_POS = getKOTHPos()  -- scan setiap kali nak masuk
+
                 if wasHolding then
                     if claimed and kingAura > myAura then
                         wasHolding = false
@@ -1585,7 +1597,6 @@ task.spawn(function()
                             hopToLeastPopulated("Killed")
                             task.wait(5)
                         else
-                            -- Stay in server, only re-enter if king is weak
                             kAutoStatus.Text = "💀 Killed! Checking..."
                             kAutoStatus.TextColor3 = WARN
                             task.wait(2)
@@ -1594,7 +1605,7 @@ task.spawn(function()
                             if not claimed2 or myAura2 > kingAura2 then
                                 kAutoStatus.Text = "🔁 Re-entering..."
                                 kAutoStatus.TextColor3 = WARN
-                                teleport(KOTH_POS)
+                                if KOTH_POS then teleport(KOTH_POS) end
                             else
                                 kAutoStatus.Text = "💪 King strong — waiting"
                                 kAutoStatus.TextColor3 = RED
@@ -1604,16 +1615,16 @@ task.spawn(function()
                         wasHolding = false
                         kAutoStatus.Text = "🔁 Re-entering..."
                         kAutoStatus.TextColor3 = WARN
-                        teleport(KOTH_POS)
+                        if KOTH_POS then teleport(KOTH_POS) end
                     end
                 elseif not claimed then
                     kAutoStatus.Text = "🟢 Empty — entering!"
                     kAutoStatus.TextColor3 = GREEN
-                    teleport(KOTH_POS)
+                    if KOTH_POS then teleport(KOTH_POS) end
                 elseif myAura > kingAura then
                     kAutoStatus.Text = "⚡ King weak — entering!"
                     kAutoStatus.TextColor3 = WARN
-                    teleport(KOTH_POS)
+                    if KOTH_POS then teleport(KOTH_POS) end
                 else
                     if autoServerHop then
                         kAutoStatus.Text = "💪 King strong — hopping!"
@@ -1629,7 +1640,6 @@ task.spawn(function()
         task.wait(3)
     end
 end)
-
 -- ============================================================
 -- TOGGLE EVENTS
 -- ============================================================
