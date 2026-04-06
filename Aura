@@ -587,6 +587,19 @@ local function fmtA(n)
     return string.format("%.0f", n)
 end
 
+-- --- Toggle Helper ---
+local function setToggle(pill, dot, stroke, on)
+    if on then
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
+    else
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
+    end
+end
+
 -- --- Build KOTH Panel ---
 local yK = GAP
 
@@ -1138,19 +1151,6 @@ SetBtn.BackgroundColor3 = PURPLE; SetBtn.BorderSizePixel = 0
 SetBtn.Text = "Set"; SetBtn.TextColor3 = WHITE; SetBtn.TextSize = 10
 SetBtn.Font = Enum.Font.GothamBold; SetBtn.ZIndex = 12; SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0,6)
-
--- --- Toggle Helper ---
-local function setToggle(pill, dot, stroke, on)
-    if on then
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
-    else
-        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
-        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
-        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
-    end
-end
 
 -- --- Status Update ---
 local function updateStatus()
