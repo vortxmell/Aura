@@ -1300,6 +1300,7 @@ local CONFIG_FILE  = "autohub_config.json"
 local AUTOLOAD_KEY = "__autoload__"
 local hasFS        = false
 local selectedCfg  = nil
+local isLoading    = false  -- guard: prevent autoSave from overwriting during load
 
 pcall(function()
     hasFS = type(writefile) == "function" and type(readfile) == "function"
@@ -1387,6 +1388,7 @@ end
 local function autoSave()
     task.spawn(function()
         task.wait(0.5)
+        if isLoading then return end  -- skip if load just happened (prevent race condition)
         local configs = loadConfigFile()
         if selectedCfg and configs[selectedCfg] then
             configs[selectedCfg] = getCurrentSettings()
@@ -1693,7 +1695,11 @@ end)
 btnLoad.MouseButton1Click:Connect(function()
     if not selectedCfg then setConfigStatus("⚠ Select a config!", true); return end
     local configs = loadConfigFile()
-    if configs[selectedCfg] then applySettings(configs[selectedCfg]); setConfigStatus("✓ Loaded: " .. selectedCfg)
+    if configs[selectedCfg] then
+        isLoading = true
+        applySettings(configs[selectedCfg])
+        setConfigStatus("✓ Loaded: " .. selectedCfg)
+        task.delay(1, function() isLoading = false end)
     else setConfigStatus("! Config not found!", true) end
 end)
 
