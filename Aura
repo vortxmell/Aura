@@ -53,6 +53,7 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
+local kothRebirthCount   = 0 
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
