@@ -1,3 +1,5 @@
+local success, err = xpcall(function()
+
 -- Auto Hub v3 - 2 Column Layout + Auto Server Hop
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
@@ -1895,3 +1897,10 @@ player.CharacterAdded:Connect(function()
 end)
 
 print("Auto Hub v3 loaded! 2-Column Layout + Auto Server Hop")
+
+end, function(e)
+    warn("=== AUTOHUB ERROR ===")
+    warn(e)
+    warn(debug.traceback())
+end)
+if not success then warn("Script failed: " .. tostring(err)) end
