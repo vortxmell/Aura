@@ -52,7 +52,6 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39  -- default 500Dd
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
-local setToggle  -- forward declaration
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -701,7 +700,6 @@ makeKDiv()
 makeKSection("AUTO REBIRTH (KOTH)")
 
 -- Toggle row
-local kRebRowY = yK  -- capture position DULU sebelum yK berubah
 local kRebRow = Instance.new("Frame")
 kRebRow.Size = UDim2.new(1,-10,0,ROW_H); kRebRow.Position = UDim2.new(0,5,0,yK)
 kRebRow.BackgroundColor3 = PANEL; kRebRow.BorderSizePixel = 0; kRebRow.Parent = PanelKOTH
@@ -722,11 +720,10 @@ kRebDot.Size = UDim2.new(0,10,0,10); kRebDot.Position = UDim2.new(0,2,0.5,-5)
 kRebDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebDot.BorderSizePixel = 0; kRebDot.Parent = kRebPill
 Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
 -- FIX: Hitbox parent kat PanelKOTH bukan kRebRow, position sama tapi ZIndex lebih tinggi supaya tak di-overlap kRebInputRow
--- BARU (hitbox dalam kRebRow, sama macam semua toggle lain):
 local kRebHitbox = Instance.new("TextButton")
-kRebHitbox.Size = UDim2.new(1,0,1,0)
-kRebHitbox.BackgroundTransparency = 1
-kRebHitbox.Text = ""; kRebHitbox.Parent = kRebRow
+kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,yK)
+kRebHitbox.BackgroundTransparency = 1; kRebHitbox.ZIndex = 3
+kRebHitbox.Text = ""; kRebHitbox.Parent = PanelKOTH
 yK = yK + ROW_H + GAP
 
 -- Input row: value + unit dropdown
@@ -918,12 +915,6 @@ end)
 
 local kothRebirthCount = 0
 kRebHitbox.MouseButton1Click:Connect(function()
-    print("[DEBUG] clicked")
-    print("[DEBUG] setToggle =", setToggle)
-    print("[DEBUG] updateKRebTarget =", updateKRebTarget)
-    print("[DEBUG] kRebPill =", kRebPill)
-    print("[DEBUG] kRebDot =", kRebDot)
-    print("[DEBUG] kRebStroke =", kRebStroke)
     autoKothRebirth = not autoKothRebirth
     setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
     kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
@@ -950,44 +941,6 @@ task.spawn(function()
 end)
 
 PanelKOTH.CanvasSize = UDim2.new(0,0,0,yK+4)
-
-task.spawn(function()
-    task.wait(3)
-    -- Check semua GuiObject yang overlap dengan kRebRow
-    local absPos = kRebRow.AbsolutePosition
-    local absSize = kRebRow.AbsoluteSize
-    print("[OVERLAP] kRebRow pos:", absPos, "size:", absSize)
-    for _, v in ipairs(ScreenGui:GetDescendants()) do
-        if v:IsA("TextButton") and v ~= kRebHitbox then
-            local vPos = v.AbsolutePosition
-            local vSize = v.AbsoluteSize
-            -- Check kalau overlap
-            if vPos.X < absPos.X + absSize.X and
-               vPos.X + vSize.X > absPos.X and
-               vPos.Y < absPos.Y + absSize.Y and
-               vPos.Y + vSize.Y > absPos.Y then
-                print("[OVERLAP] FOUND:", v.Name, 
-                    "ZIndex:", v.ZIndex,
-                    "Parent:", v.Parent.Name,
-                    "pos:", vPos, "size:", vSize)
-            end
-        end
-    end
-end)
-
--- Letak lepas PanelKOTH.CanvasSize line
-task.spawn(function()
-    task.wait(2)
-    for _, v in ipairs(PanelKOTH:GetDescendants()) do
-        if v:IsA("TextButton") then
-            print("[SCAN] TextButton:", v.Name, 
-                "| Pos:", v.AbsolutePosition, 
-                "| Size:", v.AbsoluteSize,
-                "| ZIndex:", v.ZIndex,
-                "| Parent:", v.Parent.Name)
-        end
-    end
-end)
 
 -- --- KOTH Logic (Hitbox Polling) ---
 local kothHitbox = nil
@@ -1187,7 +1140,7 @@ SetBtn.Font = Enum.Font.GothamBold; SetBtn.ZIndex = 12; SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0,6)
 
 -- --- Toggle Helper ---
-function setToggle(pill, dot, stroke, on)
+local function setToggle(pill, dot, stroke, on)
     if on then
         TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
         TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
