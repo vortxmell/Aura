@@ -248,8 +248,8 @@ local function makeTabBtn(icon, posY)
     return btn
 end
 
-local TabFarm   = makeTabBtn("⚡", 8)
-local TabKOTH   = makeTabBtn("👑", 50)
+local TabKOTH   = makeTabBtn("👑", 8)
+local TabFarm   = makeTabBtn("⚡", 50)
 local TabConfig = makeTabBtn("💾", 92)
 
 local TabIndicator = Instance.new("Frame")
@@ -1024,7 +1024,7 @@ local function switchTab(tab)
     TweenService:Create(TabFarm,   tweenInfo, {BackgroundTransparency = tab=="farm"   and 0.6 or 1}):Play()
     TweenService:Create(TabConfig, tweenInfo, {BackgroundTransparency = tab=="config" and 0.6 or 1}):Play()
     TweenService:Create(TabKOTH,   tweenInfo, {BackgroundTransparency = tab=="koth"   and 0.6 or 1}):Play()
-    local indicatorY = tab=="farm" and 13 or tab=="koth" and 55 or 97
+    local indicatorY = tab=="koth" and 13 or tab=="farm" and 55 or 97
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0,indicatorY)}):Play()
     if tab == "koth" then updateKOTHPanel() end
 end
