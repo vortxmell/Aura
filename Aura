@@ -1500,7 +1500,7 @@ end
 -- AUTO KOTH LOOP - with autoServerHop check
 -- ============================================================
 task.spawn(function()
-    local KOTH_POS = Vector3.new(-118, 32, 123)
+    local KOTH_POS = Vector3.new(-91, 168, 952)
     local wasHolding = false
 
     while ScreenGui.Parent do
