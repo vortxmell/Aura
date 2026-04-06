@@ -917,11 +917,31 @@ end)
 
 local kothRebirthCount = 0
 kRebHitbox.MouseButton1Click:Connect(function()
+    print("[DEBUG] clicked")
+    print("[DEBUG] setToggle =", setToggle)
+    print("[DEBUG] updateKRebTarget =", updateKRebTarget)
+    print("[DEBUG] kRebPill =", kRebPill)
+    print("[DEBUG] kRebDot =", kRebDot)
+    print("[DEBUG] kRebStroke =", kRebStroke)
     autoKothRebirth = not autoKothRebirth
     setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
     kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
     kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
     updateKRebTarget()
+end)
+
+-- Letak lepas PanelKOTH.CanvasSize line
+task.spawn(function()
+    task.wait(2)
+    for _, v in ipairs(PanelKOTH:GetDescendants()) do
+        if v:IsA("TextButton") then
+            print("[SCAN] TextButton:", v.Name, 
+                "| Pos:", v.AbsolutePosition, 
+                "| Size:", v.AbsoluteSize,
+                "| ZIndex:", v.ZIndex,
+                "| Parent:", v.Parent.Name)
+        end
+    end
 end)
 
 -- Loop auto rebirth KOTH
