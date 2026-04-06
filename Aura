@@ -2,7 +2,9 @@
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
+local placeId = game.PlaceId
 local RequestRebirth = nil
 task.spawn(function()
     local ok2, result = pcall(function()
@@ -51,7 +53,6 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
-local kothRebirthCount   = 0 
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -1357,20 +1358,15 @@ local function applySettings(s)
     if s.autoRebirth     ~= nil then autoRebirth     = s.autoRebirth;     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)     end
     if s.autoCombo       ~= nil then autoCombo       = s.autoCombo;       setToggle(ComboPill,   ComboDot,   ComboStroke,   autoCombo)       end
     if s.zoneGuard       ~= nil then zoneGuard       = s.zoneGuard;       setToggle(ZonePill,    ZoneDot,    ZoneStroke,    zoneGuard)       end
-    if s.autoKOTH ~= nil then
-    autoKOTH = s.autoKOTH
-    if kAutoPill and kAutoDot and kAutoStroke then
+    if s.autoKOTH        ~= nil then
+        autoKOTH = s.autoKOTH
         setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
         kAutoStatus.Text = autoKOTH and "🔄 Running..." or "💤 Idle"
         kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
     end
-end
-if s.autoServerHop ~= nil then
-    autoServerHop = s.autoServerHop
-    if kHopPill and kHopDot and kHopStroke then
+    if s.autoServerHop ~= nil then
+        autoServerHop = s.autoServerHop
         setToggle(kHopPill, kHopDot, kHopStroke, autoServerHop)
-    end
-end
     end
     if s.autoKothRebirth ~= nil then
         autoKothRebirth = s.autoKothRebirth
@@ -1868,7 +1864,13 @@ task.spawn(function()
 end)
 
 -- Kick / disconnect detection
--- TeleportService disabled (Delta tidak support)
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.RequestedFromServer then
+        warn("[AutoHub] Server teleport detected")
+        task.wait(3)
+        pcall(function() TeleportService:Teleport(placeId, player) end)
+    end
+end)
 
 game:GetService("Players").LocalPlayer.Idled:Connect(function(time)
     warn("[AutoHub] Player idle detected - " .. tostring(time) .. "s idle")
