@@ -52,6 +52,7 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39  -- default 500Dd
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
+local setToggle  -- forward declaration
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -1186,7 +1187,7 @@ SetBtn.Font = Enum.Font.GothamBold; SetBtn.ZIndex = 12; SetBtn.Parent = Popup
 Instance.new("UICorner", SetBtn).CornerRadius = UDim.new(0,6)
 
 -- --- Toggle Helper ---
-local function setToggle(pill, dot, stroke, on)
+function setToggle(pill, dot, stroke, on)
     if on then
         TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
         TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
