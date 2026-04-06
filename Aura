@@ -2,9 +2,7 @@
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local placeId = game.PlaceId
 local RequestRebirth = nil
 task.spawn(function()
     local ok2, result = pcall(function()
@@ -1870,13 +1868,7 @@ task.spawn(function()
 end)
 
 -- Kick / disconnect detection
-game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
-    if state == Enum.TeleportState.RequestedFromServer then
-        warn("[AutoHub] Server teleport detected")
-        task.wait(3)
-        pcall(function() TeleportService:Teleport(placeId, player) end)
-    end
-end)
+-- TeleportService disabled (Delta tidak support)
 
 game:GetService("Players").LocalPlayer.Idled:Connect(function(time)
     warn("[AutoHub] Player idle detected - " .. tostring(time) .. "s idle")
