@@ -1439,16 +1439,22 @@ local function hopToLeastPopulated(reason)
     if kothHopping then return end
     kothHopping = true
     autoSave()
-    kAutoStatus.Text = "🔄 Hopping... (" .. (reason or "?") .. ")"
+    kAutoStatus.Text = "🔄 Scanning... (" .. (reason or "?") .. ")"
     kAutoStatus.TextColor3 = WARN
 
     task.spawn(function()
         local currentJobId = game.JobId
-        local bestServer = nil
-        local bestCount = math.huge
-        local cursor = ""
+        local bestServer   = nil
+        local bestCount    = math.huge
+        local soloServer   = nil   -- priority: server dengan exactly 1 player
+        local allServers   = {}    -- fallback pool
+        local cursor       = ""
+        local totalScanned = 0
 
-        for page = 1, 3 do
+        -- Scan up to 5 pages (max 500 servers)
+        for page = 1, 5 do
+            kAutoStatus.Text = string.format("🔍 Scanning page %d/5...", page)
+
             local url = string.format(
                 "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
                 placeId
@@ -1456,9 +1462,15 @@ local function hopToLeastPopulated(reason)
             if cursor ~= "" then url = url .. "&cursor=" .. cursor end
 
             local ok2, result = pcall(function()
-                return (typeof(request)=="function" and request({Url=url,Method="GET"}).Body) or game:HttpGet(url)
+                return (typeof(request) == "function"
+                    and request({Url = url, Method = "GET"}).Body)
+                    or game:HttpGet(url)
             end)
-            if not ok2 then break end
+            if not ok2 then
+                kAutoStatus.Text = "⚠ API error pg " .. page
+                task.wait(0.5)
+                break
+            end
 
             local ok3, data = pcall(function()
                 return game:GetService("HttpService"):JSONDecode(result)
@@ -1466,29 +1478,61 @@ local function hopToLeastPopulated(reason)
             if not ok3 or not data or not data.data then break end
 
             for _, server in ipairs(data.data) do
-                if server.id ~= currentJobId and server.playing ~= nil then
+                -- Skip server semasa dan server kosong (ghost server)
+                if server.id ~= currentJobId
+                    and server.playing ~= nil
+                    and server.playing >= 1
+                then
+                    totalScanned = totalScanned + 1
+                    table.insert(allServers, server)
+
+                    -- Priority 1: server solo (1 player je)
+                    if server.playing == 1 and soloServer == nil then
+                        soloServer = server
+                    end
+
+                    -- Priority 2: server paling sikit player
                     if server.playing < bestCount then
-                        bestCount = server.playing
+                        bestCount  = server.playing
                         bestServer = server
                     end
                 end
             end
 
+            -- Kalau dah jumpa solo server, tak payah scan lagi
+            if soloServer then
+                kAutoStatus.Text = "✅ Solo server found!"
+                break
+            end
+
             if data.nextPageCursor and data.nextPageCursor ~= "" then
                 cursor = data.nextPageCursor
+                task.wait(0.2) -- small delay elak rate limit
             else
                 break
             end
         end
 
-        if bestServer then
-            kAutoStatus.Text = string.format("🚀 Hopping -> %d player(s)", bestCount)
+        -- Pilih server ikut priority
+        local target = soloServer or bestServer
+
+        -- Fallback: kalau bestServer pun takde, random dari pool
+        if not target and #allServers > 0 then
+            target = allServers[math.random(1, #allServers)]
+            kAutoStatus.Text = "🎲 Random fallback server"
+        end
+
+        if target then
+            kAutoStatus.Text = string.format(
+                "🚀 Hopping -> %d player(s) [scanned %d]",
+                target.playing, totalScanned
+            )
             task.wait(1)
             pcall(function()
-                TeleportService:TeleportToPlaceInstance(placeId, bestServer.id, player)
+                TeleportService:TeleportToPlaceInstance(placeId, target.id, player)
             end)
         else
-            kAutoStatus.Text = "❌ No server found"
+            kAutoStatus.Text = string.format("❌ No server found (%d scanned)", totalScanned)
             kAutoStatus.TextColor3 = RED
             task.wait(3)
             kothHopping = false
