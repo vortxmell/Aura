@@ -723,7 +723,10 @@ Instance.new("UICorner", kRebDot).CornerRadius = UDim.new(1,0)
 local kRebHitbox = Instance.new("TextButton")
 kRebHitbox.Size = UDim2.new(1,-10,0,ROW_H); kRebHitbox.Position = UDim2.new(0,5,0,yK)
 kRebHitbox.BackgroundTransparency = 1; kRebHitbox.ZIndex = 3
-kRebHitbox.Text = ""; kRebHitbox.Parent = PanelKOTH
+kRebHitbox.Text = ""; kRebHitbox.Parent = kRebRow
+kRebHitbox.Size = UDim2.new(1, 0, 1, 0)
+kRebHitbox.Position = UDim2.new(0, 0, 0, 0)
+kRebHitbox.ZIndex = 5
 yK = yK + ROW_H + GAP
 
 -- Input row: value + unit dropdown
