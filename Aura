@@ -995,9 +995,8 @@ local function getCurrentSettings()
         autoKOTH               = autoKOTH,
         autoServerHop          = autoServerHop,
         autoKothRebirth        = autoKothRebirth,
-        kothRebirthVal         = kothRebirthVal,
-        kothRebirthUnit        = kothRebirthUnit,
-        kothRebirthMultiplier  = kothRebirthMultiplier,  -- NEW
+        -- rebirth target/unit/multiplier tidak disave di sini
+        -- ia diurus sepenuhnya oleh __lasttarget__ auto-save
     }
 end
 
@@ -1019,16 +1018,8 @@ local function applySettings(s)
         kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
         kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
     end
-    if s.kothRebirthVal  ~= nil then kothRebirthVal  = s.kothRebirthVal;  kRebInput.Text = tostring(kothRebirthVal) end
-    if s.kothRebirthUnit ~= nil then
-        kothRebirthUnit = s.kothRebirthUnit
-        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
-    end
-    -- NEW: restore multiplier
-    if s.kothRebirthMultiplier ~= nil then
-        kothRebirthMultiplier = s.kothRebirthMultiplier
-        kRebMultInput.Text = tostring(kothRebirthMultiplier)
-    end
+    -- rebirth target/unit/multiplier tidak di-restore dari named config
+    -- ia diurus oleh __lasttarget__ dalam INIT
     updateKRebTarget()
 end
 
