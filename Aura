@@ -810,8 +810,11 @@ do
     KMF.Position = UDim2.new(0, PAD, 0, yR)
     KMF.BackgroundColor3 = PANEL; KMF.BorderSizePixel = 0; KMF.Parent = R
     Instance.new("UICorner", KMF).CornerRadius = UDim.new(0,6)
-    KMFStroke = Instance.new("UIStroke", KMF)
-    KMFStroke.Color = Color3.fromRGB(60,45,90); KMFStroke.Thickness = 1
+    local tempStroke = Instance.new("UIStroke")
+    tempStroke.Color = Color3.fromRGB(60,45,90)
+    tempStroke.Thickness = 1
+    tempStroke.Parent = KMF
+    KMFStroke = tempStroke
     
     kothH = math.max(yL, yR) + GAP
 end
@@ -1960,4 +1963,4 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("Under dev.. koth mult test2")
+print("Under dev.. koth mult test3")
