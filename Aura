@@ -1982,9 +1982,39 @@ task.spawn(function()
 end)
 
 -- ============================================================
+-- HELPER FUNCTIONS (kena ada sebelum KOTH loop)
+-- ============================================================
+local function normalizeKRebTarget()
+    -- Update target value & label lepas multiply
+    kothRebirthTarget = kothRebirthVal * (
+        (function()
+            for _,s in ipairs(suffixes) do
+                if s[2] == kothRebirthUnit then return s[1] end
+            end
+            return 1
+        end)()
+    )
+    if kRebVal then kRebVal.Text = tostring(kothRebirthVal) end
+    if kRebUnit then kRebUnit.Text = kothRebirthUnit end
+end
+
+local function updateKRebTarget()
+    normalizeKRebTarget()
+end
+
+local function autoSave()
+    -- Save current settings kalau ada config yang loaded
+    if not hasFS then return end
+    if not selectedCfg then return end
+    local configs = loadConfigFile()
+    if configs and configs[selectedCfg] then
+        configs[selectedCfg] = getCurrentSettings()
+        saveConfigFile(configs)
+    end
+end
+-- ============================================================
 -- KOTH REBIRTH LOOP - with multiplier + normalize
 -- ============================================================
--- Letak ni dalam KOTH rebirth loop, ganti code lama
 task.spawn(function()
     while true do
         if autoKothRebirth then
@@ -1996,19 +2026,14 @@ task.spawn(function()
                 kothRebirthCount = kothRebirthCount + 1
                 kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
 
-                local ok, err = pcall(function()
-                    if kothRebMultOn then
-                        kothRebirthVal = kothRebirthVal * kothRebMult
-                        normalizeKRebTarget()  -- <-- ni yang crash
-                    else
-                        updateKRebTarget()     -- <-- atau ni
-                    end
-                end)
-                if not ok then warn("[AutoHub] KOTH loop error: " .. tostring(err)) end
+                if kothRebMultOn then
+                    kothRebirthVal = kothRebirthVal * kothRebMult
+                    normalizeKRebTarget()
+                else
+                    updateKRebTarget()
+                end
 
-                local ok2, err2 = pcall(autoSave)
-                if not ok2 then warn("[AutoHub] autoSave error: " .. tostring(err2)) end
-
+                autoSave()
                 task.wait(1)
             end
         end
