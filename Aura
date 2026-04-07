@@ -882,13 +882,18 @@ do
     kothH = math.max(yL, yR) + GAP
 end
 local _km = _G._AH_KothMult
-local KMPillHitbox = _km.KMPillHitbox
-local KMPill       = _km.KMPill
-local KMDot        = _km.KMDot
-local KMFStroke    = _km.KMFStroke
-local KMMinus      = _km.KMMinus
-local KMBox        = _km.KMBox
-local KMPlus       = _km.KMPlus
+if not _km then
+    warn("[AutoHub] ERROR: _G._AH_KothMult is nil!")
+else
+    warn("[AutoHub] KothMult table OK")
+end
+local KMPillHitbox = _km and _km.KMPillHitbox
+local KMPill       = _km and _km.KMPill
+local KMDot        = _km and _km.KMDot
+local KMFStroke    = _km and _km.KMFStroke
+local KMMinus      = _km and _km.KMMinus
+local KMBox        = _km and _km.KMBox
+local KMPlus       = _km and _km.KMPlus
 _G._AH_KothMult    = nil
 
 -- ============================================================
