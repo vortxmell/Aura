@@ -53,7 +53,6 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
-local kothRebirthVal     = 500
 local kothMultiplierOn   = false   -- toggle ON/OFF koth multiplier
 local kothMultiplier     = 2       -- default multiplier 2x
 
