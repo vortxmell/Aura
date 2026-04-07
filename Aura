@@ -1954,4 +1954,4 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("Auto Hub v3 loaded! 2-Column Layout + Auto Server Hop")
+print("Under dev.. koth mult test1")
