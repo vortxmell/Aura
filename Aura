@@ -1,4 +1,507 @@
-AD, 0, y)
+-- Auto Hub v3 - 2 Column Layout + Auto Server Hop
+local player = game.Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local placeId = game.PlaceId
+local RequestRebirth = nil
+task.spawn(function()
+    local ok2, result = pcall(function()
+        return RS
+            :WaitForChild("Packages", 15)
+            :WaitForChild("Knit", 15)
+            :WaitForChild("Services", 15)
+            :WaitForChild("PlayerService", 15)
+            :WaitForChild("RF", 15)
+            :WaitForChild("RequestRebirth", 15)
+    end)
+    if ok2 then
+        RequestRebirth = result
+    else
+        warn("[AutoHub] RequestRebirth not found: " .. tostring(result))
+    end
+end)
+
+local areas = {
+    {name = "Fire Bath",     req = 100e6,   pos = Vector3.new(123,   8,  -117)},
+    {name = "Dark Lava",     req = 1e15,    pos = Vector3.new(7,    15,  -132)},
+    {name = "Ancient Ruins", req = 100e18,  pos = Vector3.new(289,  11,  -245)},
+    {name = "Egg Basket",    req = 99e21,   pos = Vector3.new(326,  10,   -82)},
+    {name = "Electra Field", req = 100e24,  pos = Vector3.new(69,   10,   166)},
+    {name = "Divine Realm",  req = 1e30,    pos = Vector3.new(79,   31,  -334)},
+    {name = "Frost Heaven",  req = 100e33,  pos = Vector3.new(-219, 10,   -50)},
+    {name = "Fallen Star",   req = 10e39,   pos = Vector3.new(321,  14,   112)},
+}
+
+local autoTraining       = false
+local autoRebirth        = false
+local autoCombo          = false
+local zoneGuard          = false
+local multiplierOn       = false
+local currentArea        = nil
+local rebirthCount       = 0
+local isRebirthing       = false
+local threshold          = 2
+local multiplier         = 2
+local comboTarget        = nil
+local autoKOTH           = false
+local autoServerHop      = true   -- NEW: default ON
+local forceHop           = false
+local kothHopping        = false
+local autoKothRebirth    = false
+local kothRebirthTarget  = 500e39
+local kothRebirthUnit    = "Dd"
+local kothRebirthVal     = 500
+local kothMultiplierOn   = false   -- toggle ON/OFF koth multiplier
+local kothMultiplier     = 2       -- default multiplier 2x
+
+local suffixes = {
+    {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
+    {1e51,"Sxd"},{1e48,"Qid"},{1e45,"Qad"},{1e42,"Td"},
+    {1e39,"Dd"}, {1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
+    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
+    {1e15,"Qa"},{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"👑"},
+}
+local function formatNum(n)
+    for _,s in ipairs(suffixes) do
+        if n >= s[1] then return string.format("%.1f%s", n/s[1], s[2]) end
+    end
+    return tostring(math.floor(n))
+end
+local function getAura() return player:GetAttribute("Aura") or 0 end
+local function teleport(pos)
+    local c = player.Character
+    if c and c:FindFirstChild("HumanoidRootPart") then
+        c.HumanoidRootPart.CFrame = CFrame.new(pos)
+    end
+end
+local function getBestArea(aura)
+    local best = nil
+    for _,a in ipairs(areas) do if aura >= a.req then best = a end end
+    return best
+end
+local function getNextArea(aura)
+    for _,a in ipairs(areas) do if aura < a.req then return a end end
+    return nil
+end
+local function getAreaIndex(area)
+    if not area then return 0 end
+    for i,a in ipairs(areas) do if a.name == area.name then return i end end
+    return 0
+end
+local function formatThresh(n)
+    if n == math.floor(n) then return tostring(math.floor(n)).."x"
+    else return string.format("%.1fx", n) end
+end
+
+-- --- Constants ---
+local TAB_W   = 36
+local ROW_H   = 16
+local SEC_H   = 11
+local STAT_H  = 11
+local GAP     = 3
+local PAD_TOP = 38
+local WHITE   = Color3.fromRGB(255, 255, 255)
+local DIM     = Color3.fromRGB(180, 175, 200)
+local PURPLE  = Color3.fromRGB(110, 70, 200)
+local WARN    = Color3.fromRGB(255, 180, 60)
+local GREEN   = Color3.fromRGB(80, 200, 120)
+local RED     = Color3.fromRGB(220, 80, 80)
+local DARK    = Color3.fromRGB(10, 10, 14)
+local PANEL   = Color3.fromRGB(18, 16, 26)
+
+-- Window width: 320px, content = 320 - 36(tab) - 1(div) = 283px
+-- Left col: 130px, vert divider: 1px, right col: 152px
+local CONTENT_W = 283
+local LEFT_W    = 130
+local RIGHT_W   = 152
+local VDIV_X    = TAB_W + 1 + LEFT_W  -- absolute X of vertical divider in Main
+
+-- --- ScreenGui ---
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ok then ScreenGui.Parent = player.PlayerGui end
+
+-- --- Main Frame (width 320, height set later) ---
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 320, 0, 300)
+Main.Position = UDim2.new(0, 16, 0.5, -150)
+Main.BackgroundColor3 = DARK
+Main.BackgroundTransparency = 0.3
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = false
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+local MainStroke = Instance.new("UIStroke", Main)
+MainStroke.Color = Color3.fromRGB(80, 60, 120)
+MainStroke.Thickness = 1
+
+-- --- Title Bar ---
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 36)
+TitleBar.BackgroundTransparency = 1
+TitleBar.Active = true
+TitleBar.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ AUTO HUB"
+Title.TextColor3 = WHITE
+Title.TextSize = 13
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 22, 0, 22)
+MinBtn.Position = UDim2.new(1, -52, 0.5, -11)
+MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
+MinBtn.BorderSizePixel = 0
+MinBtn.Text = "—"
+MinBtn.TextColor3 = WHITE
+MinBtn.TextSize = 10
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.ZIndex = 5
+MinBtn.Parent = TitleBar
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(1, 0)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 22, 0, 22)
+CloseBtn.Position = UDim2.new(1, -26, 0.5, -11)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 50, 70)
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = WHITE
+CloseBtn.TextSize = 10
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.ZIndex = 5
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(1, 0)
+
+-- Drag logic
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        local relX = i.Position.X - Main.AbsolutePosition.X
+        if relX > (Main.AbsoluteSize.X - 60) then return end
+        dragging = true; dragStart = i.Position; startPos = Main.Position
+    end
+end)
+TitleBar.InputChanged:Connect(function(i)
+    if dragging and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
+        local d = i.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
+    end
+end)
+TitleBar.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+local TitleDiv = Instance.new("Frame")
+TitleDiv.Size = UDim2.new(1, 0, 0, 1)
+TitleDiv.Position = UDim2.new(0, 0, 0, 36)
+TitleDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+TitleDiv.BorderSizePixel = 0
+TitleDiv.Parent = Main
+
+-- --- Tab Bar ---
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(0, TAB_W, 1, -PAD_TOP)
+TabBar.Position = UDim2.new(0, 0, 0, PAD_TOP)
+TabBar.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+TabBar.BackgroundTransparency = 0.2
+TabBar.BorderSizePixel = 0
+TabBar.Parent = Main
+Instance.new("UICorner", TabBar).CornerRadius = UDim.new(0, 10)
+
+local TabDiv = Instance.new("Frame")
+TabDiv.Size = UDim2.new(0, 1, 1, -PAD_TOP)
+TabDiv.Position = UDim2.new(0, TAB_W, 0, PAD_TOP)
+TabDiv.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+TabDiv.BorderSizePixel = 0
+TabDiv.Parent = Main
+
+-- --- Tab Buttons ---
+local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
+local function makeTabBtn(icon, posY)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 0, 34)
+    btn.Position = UDim2.new(0, 3, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 25, 45)
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel = 0
+    btn.Text = icon
+    btn.TextColor3 = DIM
+    btn.TextSize = 16
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+local TabKOTH   = makeTabBtn("👑", 8)
+local TabFarm   = makeTabBtn("⚡", 50)
+local TabConfig = makeTabBtn("💾", 92)
+
+local TabIndicator = Instance.new("Frame")
+TabIndicator.Size = UDim2.new(0, 3, 0, 24)
+TabIndicator.Position = UDim2.new(0, 0, 0, 13)
+TabIndicator.BackgroundColor3 = PURPLE
+TabIndicator.BorderSizePixel = 0
+TabIndicator.Parent = TabBar
+Instance.new("UICorner", TabIndicator).CornerRadius = UDim.new(0, 4)
+
+-- --- Content Area ---
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -(TAB_W+1), 1, -PAD_TOP)
+ContentArea.Position = UDim2.new(0, TAB_W+1, 0, PAD_TOP)
+ContentArea.BackgroundTransparency = 1
+ContentArea.BorderSizePixel = 0
+ContentArea.ClipsDescendants = true
+ContentArea.Parent = Main
+
+-- --- Helper: make a plain panel (no scroll) ---
+local function makePanel()
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1, 0, 1, 0)
+    f.BackgroundTransparency = 1
+    f.BorderSizePixel = 0
+    f.Parent = ContentArea
+    return f
+end
+
+local PanelFarm   = makePanel(); PanelFarm.Visible   = false
+local PanelConfig = makePanel(); PanelConfig.Visible = false
+local PanelKOTH   = makePanel()
+
+-- --- Vertical divider helper for panels ---
+local function makeVDiv(panel)
+    local d = Instance.new("Frame")
+    d.Size = UDim2.new(0, 1, 1, 0)
+    d.Position = UDim2.new(0, LEFT_W, 0, 0)
+    d.BackgroundColor3 = Color3.fromRGB(60, 45, 90)
+    d.BorderSizePixel = 0
+    d.Parent = panel
+end
+
+-- --- Left/Right column frames ---
+local function makeColumns(panel)
+    local L = Instance.new("Frame")
+    L.Size = UDim2.new(0, LEFT_W, 1, 0)
+    L.Position = UDim2.new(0, 0, 0, 0)
+    L.BackgroundTransparency = 1
+    L.BorderSizePixel = 0
+    L.Parent = panel
+    local R = Instance.new("Frame")
+    R.Size = UDim2.new(0, RIGHT_W, 1, 0)
+    R.Position = UDim2.new(0, LEFT_W+1, 0, 0)
+    R.BackgroundTransparency = 1
+    R.BorderSizePixel = 0
+    R.Parent = panel
+    makeVDiv(panel)
+    return L, R
+end
+
+-- === TOGGLE HELPER ===
+local function setToggle(pill, dot, stroke, on)
+    if on then
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = PURPLE}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,16,0.5,-5), BackgroundColor3 = WHITE}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = PURPLE}):Play()
+    else
+        TweenService:Create(pill,   tweenInfo, {BackgroundColor3 = Color3.fromRGB(40,35,55)}):Play()
+        TweenService:Create(dot,    tweenInfo, {Position = UDim2.new(0,2,0.5,-5), BackgroundColor3 = Color3.fromRGB(100,90,130)}):Play()
+        TweenService:Create(stroke, tweenInfo, {Color = Color3.fromRGB(60,45,90)}):Play()
+    end
+end
+
+-- === fmtA helper ===
+local function fmtA(n)
+    if not n or n <= 0 then return "0" end
+    for _, s in ipairs(suffixes) do
+        if n >= s[1] then return string.format("%.2f%s", n/s[1], s[2]) end
+    end
+    return string.format("%.0f", n)
+end
+
+-- ============================================================
+-- FARM PANEL - 2 Column
+-- Left:  INDIVIDUAL toggles + UTILITY
+-- Right: COMBO section + stats
+-- ============================================================
+do
+    local L, R = makeColumns(PanelFarm)
+    local PAD = 5
+
+    -- helpers scoped to Farm
+    local function makeSec(parent, text, y)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(1, -PAD*2, 0, SEC_H)
+        l.Position = UDim2.new(0, PAD+2, 0, y)
+        l.BackgroundTransparency = 1
+        l.Text = text; l.TextColor3 = WHITE
+        l.TextSize = 8; l.Font = Enum.Font.GothamBold
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.Parent = parent
+        return y + SEC_H + GAP
+    end
+
+    local function makeToggle(parent, labelText, y, w)
+        w = w or (parent == L and LEFT_W or RIGHT_W)
+        local iw = w - PAD*2
+        local Btn = Instance.new("Frame")
+        Btn.Size = UDim2.new(0, iw, 0, ROW_H)
+        Btn.Position = UDim2.new(0, PAD, 0, y)
+        Btn.BackgroundColor3 = PANEL; Btn.BorderSizePixel = 0; Btn.Parent = parent
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        local BtnStroke = Instance.new("UIStroke", Btn)
+        BtnStroke.Color = Color3.fromRGB(60,45,90); BtnStroke.Thickness = 1
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -38, 1, 0); Label.Position = UDim2.new(0, 6, 0, 0)
+        Label.BackgroundTransparency = 1; Label.Text = labelText
+        Label.TextColor3 = WHITE; Label.TextSize = 9; Label.Font = Enum.Font.GothamBold
+        Label.TextXAlignment = Enum.TextXAlignment.Left; Label.Parent = Btn
+        local Pill = Instance.new("Frame")
+        Pill.Size = UDim2.new(0,28,0,14); Pill.Position = UDim2.new(1,-34,0.5,-7)
+        Pill.BackgroundColor3 = Color3.fromRGB(40,35,55); Pill.BorderSizePixel = 0; Pill.Parent = Btn
+        Instance.new("UICorner", Pill).CornerRadius = UDim.new(1,0)
+        local Dot = Instance.new("Frame")
+        Dot.Size = UDim2.new(0,10,0,10); Dot.Position = UDim2.new(0,2,0.5,-5)
+        Dot.BackgroundColor3 = Color3.fromRGB(100,90,130); Dot.BorderSizePixel = 0; Dot.Parent = Pill
+        Instance.new("UICorner", Dot).CornerRadius = UDim.new(1,0)
+        local Hitbox = Instance.new("TextButton")
+        Hitbox.Size = UDim2.new(1,0,1,0); Hitbox.BackgroundTransparency = 1
+        Hitbox.Text = ""; Hitbox.Parent = Btn
+        return Hitbox, Pill, Dot, BtnStroke, y + ROW_H + GAP
+    end
+
+    local function makeStatLbl(parent, text, color, y)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(1, -PAD*2, 0, STAT_H)
+        l.Position = UDim2.new(0, PAD, 0, y)
+        l.BackgroundTransparency = 1; l.Text = text
+        l.TextColor3 = color or DIM; l.TextSize = 9; l.Font = Enum.Font.Gotham
+        l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = parent
+        return l, y + STAT_H + GAP
+    end
+
+    local function makeHDiv(parent, y, w)
+        local d = Instance.new("Frame")
+        d.Size = UDim2.new(0, (w or LEFT_W) - PAD*2, 0, 1)
+        d.Position = UDim2.new(0, PAD, 0, y)
+        d.BackgroundColor3 = Color3.fromRGB(40,35,60)
+        d.BorderSizePixel = 0; d.Parent = parent
+        return y + 1 + GAP
+    end
+
+    -- ---- LEFT COLUMN ----
+    local yL = GAP
+    -- Area status
+    local StatusLabel
+    StatusLabel, yL = makeStatLbl(L, "Area: —", WHITE, yL)
+    yL = makeHDiv(L, yL, LEFT_W)
+
+    yL = makeSec(L, "INDIVIDUAL", yL)
+    local TrainBtn, TrainPill, TrainDot, TrainStroke
+    TrainBtn, TrainPill, TrainDot, TrainStroke, yL = makeToggle(L, "Auto Training", yL)
+    local RebirthBtn, RebirthPill, RebirthDot, RebirthStroke
+    RebirthBtn, RebirthPill, RebirthDot, RebirthStroke, yL = makeToggle(L, "Auto Rebirth", yL)
+
+    yL = makeHDiv(L, yL, LEFT_W)
+    yL = makeSec(L, "UTILITY", yL)
+    local ZoneBtn, ZonePill, ZoneDot, ZoneStroke
+    ZoneBtn, ZonePill, ZoneDot, ZoneStroke, yL = makeToggle(L, "Zone Guard", yL)
+
+    -- ---- RIGHT COLUMN ----
+    local yR = GAP
+    yR = makeSec(R, "COMBO", yR)
+
+    -- Train+Rebirth toggle
+    local ComboBtn, ComboPill, ComboDot, ComboStroke
+    ComboBtn, ComboPill, ComboDot, ComboStroke, yR = makeToggle(R, "Train+Rebirth", yR)
+
+    -- Target row
+    local iw = RIGHT_W - PAD*2
+    local TgFrame = Instance.new("Frame")
+    TgFrame.Size = UDim2.new(0, iw, 0, ROW_H)
+    TgFrame.Position = UDim2.new(0, PAD, 0, yR)
+    TgFrame.BackgroundColor3 = PANEL; TgFrame.BorderSizePixel = 0; TgFrame.Parent = R
+    Instance.new("UICorner", TgFrame).CornerRadius = UDim.new(0,6)
+    local TargetStroke = Instance.new("UIStroke", TgFrame)
+    TargetStroke.Color = Color3.fromRGB(60,45,90); TargetStroke.Thickness = 1
+    local TgLabel = Instance.new("TextLabel")
+    TgLabel.Size = UDim2.new(0.5,0,1,0); TgLabel.Position = UDim2.new(0,6,0,0)
+    TgLabel.BackgroundTransparency = 1; TgLabel.Text = "Target"
+    TgLabel.TextColor3 = WHITE; TgLabel.TextSize = 9; TgLabel.Font = Enum.Font.GothamBold
+    TgLabel.TextXAlignment = Enum.TextXAlignment.Left; TgLabel.Parent = TgFrame
+    local TargetVal = Instance.new("TextLabel")
+    TargetVal.Size = UDim2.new(0.48,0,1,0); TargetVal.Position = UDim2.new(0.5,0,0,0)
+    TargetVal.BackgroundTransparency = 1; TargetVal.Text = "—"
+    TargetVal.TextColor3 = WHITE; TargetVal.TextSize = 9; TargetVal.Font = Enum.Font.Gotham
+    TargetVal.TextXAlignment = Enum.TextXAlignment.Right; TargetVal.Parent = TgFrame
+    local TgArrow = Instance.new("TextLabel")
+    TgArrow.Size = UDim2.new(0,10,1,0); TgArrow.Position = UDim2.new(1,-11,0,0)
+    TgArrow.BackgroundTransparency = 1; TgArrow.Text = "›"
+    TgArrow.TextColor3 = WHITE; TgArrow.TextSize = 12; TgArrow.Font = Enum.Font.GothamBold
+    TgArrow.Parent = TgFrame
+    local TargetBtn = Instance.new("TextButton")
+    TargetBtn.Size = UDim2.new(1,0,1,0); TargetBtn.BackgroundTransparency = 1
+    TargetBtn.Text = ""; TargetBtn.Parent = TgFrame
+    yR = yR + ROW_H + GAP
+
+    -- Threshold row (−/input/+)
+    local function makeStepRow(parent, labelText, defVal, y)
+        local fw = RIGHT_W - PAD*2
+        local F = Instance.new("Frame")
+        F.Size = UDim2.new(0, fw, 0, ROW_H)
+        F.Position = UDim2.new(0, PAD, 0, y)
+        F.BackgroundColor3 = PANEL; F.BorderSizePixel = 0; F.Parent = parent
+        Instance.new("UICorner", F).CornerRadius = UDim.new(0,6)
+        local Fst = Instance.new("UIStroke", F)
+        Fst.Color = Color3.fromRGB(60,45,90); Fst.Thickness = 1
+        local Lbl = Instance.new("TextLabel")
+        Lbl.Size = UDim2.new(0.38,0,1,0); Lbl.Position = UDim2.new(0,6,0,0)
+        Lbl.BackgroundTransparency = 1; Lbl.Text = labelText
+        Lbl.TextColor3 = WHITE; Lbl.TextSize = 9; Lbl.Font = Enum.Font.GothamBold
+        Lbl.TextXAlignment = Enum.TextXAlignment.Left; Lbl.Parent = F
+        local Minus = Instance.new("TextButton")
+        Minus.Size = UDim2.new(0,14,0,12); Minus.Position = UDim2.new(1,-68,0.5,-6)
+        Minus.BackgroundColor3 = Color3.fromRGB(40,35,60); Minus.BorderSizePixel = 0
+        Minus.Text = "−"; Minus.TextColor3 = WHITE; Minus.TextSize = 11
+        Minus.Font = Enum.Font.GothamBold; Minus.Parent = F
+        Instance.new("UICorner", Minus).CornerRadius = UDim.new(1,0)
+        local Box = Instance.new("TextBox")
+        Box.Size = UDim2.new(0,34,0,12); Box.Position = UDim2.new(1,-52,0.5,-6)
+        Box.BackgroundColor3 = Color3.fromRGB(30,26,44); Box.BorderSizePixel = 0
+        Box.Text = formatThresh(defVal); Box.TextColor3 = WHITE
+        Box.TextSize = 9; Box.Font = Enum.Font.GothamBold
+        Box.ClearTextOnFocus = true; Box.Parent = F
+        Instance.new("UICorner", Box).CornerRadius = UDim.new(0,4)
+        local Plus = Instance.new("TextButton")
+        Plus.Size = UDim2.new(0,14,0,12); Plus.Position = UDim2.new(1,-16,0.5,-6)
+        Plus.BackgroundColor3 = Color3.fromRGB(40,35,60); Plus.BorderSizePixel = 0
+        Plus.Text = "+"; Plus.TextColor3 = WHITE; Plus.TextSize = 11
+        Plus.Font = Enum.Font.GothamBold; Plus.Parent = F
+        Instance.new("UICorner", Plus).CornerRadius = UDim.new(1,0)
+        return Minus, Box, Plus, Fst, y + ROW_H + GAP
+    end
+
+    local function makeInputToggle(parent, labelText, defVal, y)
+        local fw = RIGHT_W - PAD*2
+        local F = Instance.new("Frame")
+        F.Size = UDim2.new(0, fw, 0, ROW_H)
+        F.Position = UDim2.new(0, PAD, 0, y)
         F.BackgroundColor3 = PANEL; F.BorderSizePixel = 0; F.Parent = parent
         Instance.new("UICorner", F).CornerRadius = UDim.new(0,6)
         local Fst = Instance.new("UIStroke", F)
@@ -103,8 +606,8 @@ local kHopHitbox, kHopPill, kHopDot, kHopStroke   -- Auto Server Hop toggle
 local kHopBtn                                        -- Force Hop button
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
-local KMPillHitbox, KMPill, KMDot, KMFStroke  -- ← TAMBAH INI
-local KMMinus, KMBox, KMPlus                   -- ← DAN INI
+local KMPillHitbox, KMPill, KMDot, KMFStroke
+local KMMinus, KMBox, KMPlus
 local kothH
 
 do
@@ -302,10 +805,7 @@ do
     kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = R
     yR = yR + STAT_H + GAP
 
-    kothH = math.max(yL, yR) + GAP
-end
-
--- KOTH Multiplier
+    -- KOTH Multiplier
     local KMFW = RIGHT_W - PAD*2
     local KMF = Instance.new("Frame")
     KMF.Size = UDim2.new(0, KMFW, 0, ROW_H)
@@ -350,6 +850,9 @@ end
     KMPlus.Font = Enum.Font.GothamBold; KMPlus.Parent = KMF
     Instance.new("UICorner", KMPlus).CornerRadius = UDim.new(1,0)
     yR = yR + ROW_H + GAP
+
+    kothH = math.max(yL, yR) + GAP
+end
 
 -- ============================================================
 -- CONFIG PANEL - 2 Column
