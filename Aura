@@ -803,25 +803,25 @@ do
     kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = R
     yR = yR + STAT_H + GAP
     -- KOTH Multiplier row
-    local kothMultHDiv = Instance.new("Frame")
-    kothMultHDiv.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, 1)
-    kothMultHDiv.Position = UDim2.new(0, PAD, 0, yR)
-    kothMultHDiv.BackgroundColor3 = Color3.fromRGB(40,35,60)
-    kothMultHDiv.BorderSizePixel = 0; kothMultHDiv.Parent = R
+    local KMHDiv = Instance.new("Frame")
+    KMHDiv.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, 1)
+    KMHDiv.Position = UDim2.new(0, PAD, 0, yR)
+    KMHDiv.BackgroundColor3 = Color3.fromRGB(40,35,60)
+    KMHDiv.BorderSizePixel = 0; KMHDiv.Parent = R
     yR = yR + 1 + GAP
 
-    local kothMultSecLbl = Instance.new("TextLabel")
-    kothMultSecLbl.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, SEC_H)
-    kothMultSecLbl.Position = UDim2.new(0, PAD+2, 0, yR)
-    kothMultSecLbl.BackgroundTransparency = 1; kothMultSecLbl.Text = "REBIRTH MULTIPLIER"
-    kothMultSecLbl.TextColor3 = WHITE; kothMultSecLbl.TextSize = 8
-    kothMultSecLbl.Font = Enum.Font.GothamBold
-    kothMultSecLbl.TextXAlignment = Enum.TextXAlignment.Left; kothMultSecLbl.Parent = R
+    local KMSecLbl = Instance.new("TextLabel")
+    KMSecLbl.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, SEC_H)
+    KMSecLbl.Position = UDim2.new(0, PAD+2, 0, yR)
+    KMSecLbl.BackgroundTransparency = 1; KMSecLbl.Text = "REBIRTH MULTIPLIER"
+    KMSecLbl.TextColor3 = WHITE; KMSecLbl.TextSize = 8
+    KMSecLbl.Font = Enum.Font.GothamBold
+    KMSecLbl.TextXAlignment = Enum.TextXAlignment.Left; KMSecLbl.Parent = R
     yR = yR + SEC_H + GAP
 
-    local fw = RIGHT_W - PAD*2
+    local KMFW = RIGHT_W - PAD*2
     local KMF = Instance.new("Frame")
-    KMF.Size = UDim2.new(0, fw, 0, ROW_H)
+    KMF.Size = UDim2.new(0, KMFW, 0, ROW_H)
     KMF.Position = UDim2.new(0, PAD, 0, yR)
     KMF.BackgroundColor3 = PANEL; KMF.BorderSizePixel = 0; KMF.Parent = R
     Instance.new("UICorner", KMF).CornerRadius = UDim.new(0,6)
@@ -835,28 +835,30 @@ do
     KMLbl.TextXAlignment = Enum.TextXAlignment.Left; KMLbl.Parent = KMF
 
     local KMPill = Instance.new("Frame")
-    KMPill.Size = UDim2.new(0,22,0,12); KMPill.Position = UDim2.new(0,fw*0.3,0.5,-6)
+    KMPill.Size = UDim2.new(0,22,0,12); KMPill.Position = UDim2.new(0,KMFW*0.3,0.5,-6)
     KMPill.BackgroundColor3 = Color3.fromRGB(40,35,55); KMPill.BorderSizePixel = 0; KMPill.Parent = KMF
     Instance.new("UICorner", KMPill).CornerRadius = UDim.new(1,0)
+
     local KMDot = Instance.new("Frame")
     KMDot.Size = UDim2.new(0,8,0,8); KMDot.Position = UDim2.new(0,2,0.5,-4)
     KMDot.BackgroundColor3 = Color3.fromRGB(100,90,130); KMDot.BorderSizePixel = 0; KMDot.Parent = KMPill
     Instance.new("UICorner", KMDot).CornerRadius = UDim.new(1,0)
+
     local KMPillHitbox = Instance.new("TextButton")
-    KMPillHitbox.Size = UDim2.new(0,30,1,0); KMPillHitbox.Position = UDim2.new(0,fw*0.3-4,0,0)
+    KMPillHitbox.Size = UDim2.new(0,30,1,0); KMPillHitbox.Position = UDim2.new(0,KMFW*0.3-4,0,0)
     KMPillHitbox.BackgroundTransparency = 1; KMPillHitbox.Text = ""; KMPillHitbox.Parent = KMF
 
     local KMMinus = Instance.new("TextButton")
     KMMinus.Size = UDim2.new(0,14,0,12); KMMinus.Position = UDim2.new(1,-68,0.5,-6)
     KMMinus.BackgroundColor3 = Color3.fromRGB(40,35,60); KMMinus.BorderSizePixel = 0
-    KMMinus.Text = "−"; KMMinus.TextColor3 = WHITE; KMMinus.TextSize = 11
+    KMMinus.Text = "-"; KMMinus.TextColor3 = WHITE; KMMinus.TextSize = 11
     KMMinus.Font = Enum.Font.GothamBold; KMMinus.Parent = KMF
     Instance.new("UICorner", KMMinus).CornerRadius = UDim.new(1,0)
 
     local KMBox = Instance.new("TextBox")
     KMBox.Size = UDim2.new(0,34,0,12); KMBox.Position = UDim2.new(1,-52,0.5,-6)
     KMBox.BackgroundColor3 = Color3.fromRGB(30,26,44); KMBox.BorderSizePixel = 0
-    KMBox.Text = tostring(kothMultiplier); KMBox.TextColor3 = WHITE
+    KMBox.Text = tostring(kothMultiplier).."x"; KMBox.TextColor3 = WHITE
     KMBox.TextSize = 9; KMBox.Font = Enum.Font.GothamBold
     KMBox.ClearTextOnFocus = true; KMBox.Parent = KMF
     Instance.new("UICorner", KMBox).CornerRadius = UDim.new(0,4)
