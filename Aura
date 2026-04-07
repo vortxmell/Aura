@@ -1015,8 +1015,8 @@ local function getCurrentSettings()
         autoKOTH               = autoKOTH,
         autoServerHop          = autoServerHop,
         autoKothRebirth        = autoKothRebirth,
-        -- rebirth target/unit/multiplier tidak disave di sini
-        -- ia diurus sepenuhnya oleh __lasttarget__ auto-save
+        kothRebirthMultiplier  = kothRebirthMultiplier,  -- save via button
+        -- kothRebirthVal & kothRebirthUnit diurus __lasttarget__ auto-save
     }
 end
 
@@ -1038,7 +1038,11 @@ local function applySettings(s)
         kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
         kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
     end
-    -- rebirth target/unit/multiplier tidak di-restore dari named config
+    if s.kothRebirthMultiplier ~= nil then
+        kothRebirthMultiplier = s.kothRebirthMultiplier
+        kRebMultInput.Text = tostring(kothRebirthMultiplier)
+    end
+    -- kothRebirthVal & kothRebirthUnit tidak di-restore dari named config
     -- ia diurus oleh __lasttarget__ dalam INIT
     updateKRebTarget()
 end
@@ -1475,4 +1479,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test1 Auto Hub v3 loaded! KOTH + Config Only")
+print("test3 Auto Hub v3 loaded! KOTH + Config Only")
