@@ -856,7 +856,7 @@ do
     local KMBox = Instance.new("TextBox")
     KMBox.Size = UDim2.new(0,34,0,12); KMBox.Position = UDim2.new(1,-52,0.5,-6)
     KMBox.BackgroundColor3 = Color3.fromRGB(30,26,44); KMBox.BorderSizePixel = 0
-    KMBox.Text = formatThresh(kothMultiplier); KMBox.TextColor3 = WHITE
+    KMBox.Text = tostring(kothMultiplier); KMBox.TextColor3 = WHITE
     KMBox.TextSize = 9; KMBox.Font = Enum.Font.GothamBold
     KMBox.ClearTextOnFocus = true; KMBox.Parent = KMF
     Instance.new("UICorner", KMBox).CornerRadius = UDim.new(0,4)
