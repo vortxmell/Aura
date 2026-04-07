@@ -53,6 +53,8 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
+local kothRebMult        = 2
+local kothRebMultOn      = false
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -600,10 +602,12 @@ _G._AH_Farm = nil
 -- ============================================================
 local kStatusDot, kRowStatus, kRowKing, kRowKingAura, kRowMyAura, kRowResult, kRowMyRank
 local kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, kAutoStatus
-local kHopHitbox, kHopPill, kHopDot, kHopStroke   -- Auto Server Hop toggle
-local kHopBtn                                        -- Force Hop button
+local kHopHitbox, kHopPill, kHopDot, kHopStroke
+local kHopBtn
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
+local kRebMultHitbox, kRebMultPill, kRebMultDot, kRebMultStroke
+local kRebMultMinus, kRebMultBox, kRebMultPlus
 local kothH
 
 do
@@ -802,8 +806,66 @@ do
     yR = yR + STAT_H + GAP
 
     kothH = math.max(yL, yR) + GAP
-end
+    -- KOTH Rebirth Multiplier row
+    local kRebMultRow = Instance.new("Frame")
+    kRebMultRow.Size = UDim2.new(0, iw, 0, 20)
+    kRebMultRow.Position = UDim2.new(0, PAD, 0, yR)
+    kRebMultRow.BackgroundColor3 = PANEL; kRebMultRow.BorderSizePixel = 0; kRebMultRow.Parent = R
+    Instance.new("UICorner", kRebMultRow).CornerRadius = UDim.new(0,6)
+    local kRebMultStroke = Instance.new("UIStroke", kRebMultRow)
+    kRebMultStroke.Color = Color3.fromRGB(60,45,90); kRebMultStroke.Thickness = 1
 
+    local kRebMultLbl = Instance.new("TextLabel")
+    kRebMultLbl.Size = UDim2.new(0,30,1,0); kRebMultLbl.Position = UDim2.new(0,4,0,0)
+    kRebMultLbl.BackgroundTransparency = 1; kRebMultLbl.Text = "Mult:"
+    kRebMultLbl.TextColor3 = WHITE; kRebMultLbl.TextSize = 9; kRebMultLbl.Font = Enum.Font.GothamBold
+    kRebMultLbl.TextXAlignment = Enum.TextXAlignment.Left; kRebMultLbl.Parent = kRebMultRow
+
+    -- Pill toggle
+    kRebMultPill = Instance.new("Frame")
+    kRebMultPill.Size = UDim2.new(0,22,0,12); kRebMultPill.Position = UDim2.new(0,34,0.5,-6)
+    kRebMultPill.BackgroundColor3 = Color3.fromRGB(40,35,55); kRebMultPill.BorderSizePixel = 0
+    kRebMultPill.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultPill).CornerRadius = UDim.new(1,0)
+    kRebMultDot = Instance.new("Frame")
+    kRebMultDot.Size = UDim2.new(0,8,0,8); kRebMultDot.Position = UDim2.new(0,2,0.5,-4)
+    kRebMultDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebMultDot.BorderSizePixel = 0
+    kRebMultDot.Parent = kRebMultPill
+    Instance.new("UICorner", kRebMultDot).CornerRadius = UDim.new(1,0)
+    kRebMultHitbox = Instance.new("TextButton")
+    kRebMultHitbox.Size = UDim2.new(0,30,1,0); kRebMultHitbox.Position = UDim2.new(0,30,0,0)
+    kRebMultHitbox.BackgroundTransparency = 1; kRebMultHitbox.Text = ""; kRebMultHitbox.Parent = kRebMultRow
+
+    -- Minus
+    kRebMultMinus = Instance.new("TextButton")
+    kRebMultMinus.Size = UDim2.new(0,14,0,12); kRebMultMinus.Position = UDim2.new(1,-68,0.5,-6)
+    kRebMultMinus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultMinus.BorderSizePixel = 0
+    kRebMultMinus.Text = "−"; kRebMultMinus.TextColor3 = WHITE; kRebMultMinus.TextSize = 11
+    kRebMultMinus.Font = Enum.Font.GothamBold; kRebMultMinus.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultMinus).CornerRadius = UDim.new(1,0)
+
+    -- Box
+    kRebMultBox = Instance.new("TextBox")
+    kRebMultBox.Size = UDim2.new(0,34,0,12); kRebMultBox.Position = UDim2.new(1,-52,0.5,-6)
+    kRebMultBox.BackgroundColor3 = Color3.fromRGB(30,26,44); kRebMultBox.BorderSizePixel = 0
+    kRebMultBox.Text = formatThresh(kothRebMult); kRebMultBox.TextColor3 = WHITE
+    kRebMultBox.TextSize = 9; kRebMultBox.Font = Enum.Font.GothamBold
+    kRebMultBox.ClearTextOnFocus = true; kRebMultBox.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultBox).CornerRadius = UDim.new(0,4)
+
+    -- Plus
+    kRebMultPlus = Instance.new("TextButton")
+    kRebMultPlus.Size = UDim2.new(0,14,0,12); kRebMultPlus.Position = UDim2.new(1,-16,0.5,-6)
+    kRebMultPlus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultPlus.BorderSizePixel = 0
+    kRebMultPlus.Text = "+"; kRebMultPlus.TextColor3 = WHITE; kRebMultPlus.TextSize = 11
+    kRebMultPlus.Font = Enum.Font.GothamBold; kRebMultPlus.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultPlus).CornerRadius = UDim.new(1,0)
+
+    yR = yR + 20 + GAP
+    kothH = math.max(yL, yR) + GAP
+end
+-- expose koth mult controls to outer scope
+local kRebMultHitbox  = kRebMultHitbox  -- already local, just need outer ref
 -- ============================================================
 -- CONFIG PANEL - 2 Column
 -- Left:  Name input + Save button + status
@@ -1168,6 +1230,41 @@ local function updateKRebTarget()
     end
 end
 
+local function normalizeKRebTarget()
+    -- Convert raw value to best fitting unit, cap at Uvg
+    local raw = kothRebirthVal
+    -- find current unit multiplier
+    local currentUnitVal = 1e39
+    for i, u in ipairs(kRebUnitUnits) do
+        if u == kothRebirthUnit then
+            currentUnitVal = kRebUnitValues[i]
+            break
+        end
+    end
+    local rawTotal = raw * currentUnitVal
+
+    -- Find best unit (largest that fits, cap at Uvg index = #kRebUnitUnits)
+    local bestIdx = 1
+    for i = #kRebUnitUnits, 1, -1 do
+        if rawTotal >= kRebUnitValues[i] then
+            bestIdx = i
+            break
+        end
+    end
+    -- Cap at Uvg
+    if bestIdx > #kRebUnitUnits then bestIdx = #kRebUnitUnits end
+
+    kothRebirthUnit = kRebUnitUnits[bestIdx]
+    kothRebirthVal  = rawTotal / kRebUnitValues[bestIdx]
+    -- Round to 2dp untuk display
+    kothRebirthVal  = math.floor(kothRebirthVal * 100 + 0.5) / 100
+
+    -- Update UI
+    kRebInput.Text      = tostring(kothRebirthVal)
+    kRebUnitBtn.Text    = kothRebirthUnit .. " ▾"
+    kothRebirthTarget   = rawTotal
+end
+
 local UPOP_W      = 160
 local UPOP_ITEM_H = 22
 local UPOP_H      = 32 + (#kRebUnitUnits*(UPOP_ITEM_H+2)) + 32
@@ -1342,6 +1439,8 @@ local function getCurrentSettings()
         autoKothRebirth = autoKothRebirth,
         kothRebirthVal  = kothRebirthVal,
         kothRebirthUnit = kothRebirthUnit,
+        kothRebMult     = kothRebMult,
+        kothRebMultOn   = kothRebMultOn,
     }
 end
 
@@ -1379,6 +1478,14 @@ local function applySettings(s)
     if s.kothRebirthUnit ~= nil then
         kothRebirthUnit = s.kothRebirthUnit
         kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
+    end
+    if s.kothRebMult   ~= nil then
+        kothRebMult = s.kothRebMult
+        kRebMultBox.Text = formatThresh(kothRebMult)
+    end
+    if s.kothRebMultOn ~= nil then
+        kothRebMultOn = s.kothRebMultOn
+        setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
     end
     updateKRebTarget()
     ThreshBox.Text = formatThresh(threshold); MultBox.Text = formatThresh(multiplier)
@@ -1686,6 +1793,33 @@ kRebHitbox.MouseButton1Click:Connect(function()
     updateKRebTarget()
 end)
 
+kRebMultHitbox.MouseButton1Click:Connect(function()
+    kothRebMultOn = not kothRebMultOn
+    setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
+    autoSave()
+end)
+
+kRebMultMinus.MouseButton1Click:Connect(function()
+    kothRebMult = math.max(0.1, math.floor((kothRebMult - 0.1) * 10 + 0.5) / 10)
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
+end)
+
+kRebMultPlus.MouseButton1Click:Connect(function()
+    kothRebMult = math.floor((kothRebMult + 0.1) * 10 + 0.5) / 10
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
+end)
+
+kRebMultBox.FocusLost:Connect(function()
+    local n = tonumber(kRebMultBox.Text)
+    if n and n > 0 then
+        kothRebMult = math.max(0.1, n)
+    end
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
+end)
+
 MultHitbox.MouseButton1Click:Connect(function()
     multiplierOn = not multiplierOn
     setToggle(MultPill, MultDot, MultStroke, multiplierOn); autoSave()
@@ -1890,6 +2024,15 @@ task.spawn(function()
                 end
                 kothRebirthCount = kothRebirthCount + 1
                 kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
+
+                -- Apply multiplier kalau ON
+                if kothRebMultOn then
+                    kothRebirthVal = kothRebirthVal * kothRebMult
+                    normalizeKRebTarget()
+                else
+                    updateKRebTarget()
+                end
+
                 task.wait(1)
             end
         end
