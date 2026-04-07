@@ -795,6 +795,27 @@ local function normalizeTarget(rawVal, rawUnit)
     return absVal / kRebUnitValues[1], kRebUnitUnits[1], absVal
 end
 
+local CONFIG_FILE_EARLY = "autohub_config.json"
+local LAST_TARGET_KEY_EARLY = "__lasttarget__"
+local function saveRebirthTarget()
+    if isLoading then return end
+    pcall(function()
+        if not (type(writefile) == "function" and type(readfile) == "function") then return end
+        local ok2, data = pcall(readfile, CONFIG_FILE_EARLY)
+        local configs = {}
+        if ok2 and data and data ~= "" then
+            local ok3, t = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
+            if ok3 and t then configs = t end
+        end
+        configs[LAST_TARGET_KEY_EARLY] = {
+            kothRebirthVal        = kothRebirthVal,
+            kothRebirthUnit       = kothRebirthUnit,
+            kothRebirthMultiplier = kothRebirthMultiplier,
+        }
+        pcall(writefile, CONFIG_FILE_EARLY, game:GetService("HttpService"):JSONEncode(configs))
+    end)
+end
+
 local function updateKRebTarget()
     local n = tonumber(kRebInput.Text)
     if n and n > 0 then kothRebirthVal = n end
@@ -804,8 +825,7 @@ local function updateKRebTarget()
             break
         end
     end
-    -- Auto save target to current selected config (skip during load)
-    if saveRebirthTarget then saveRebirthTarget() end
+    saveRebirthTarget()
 end
 
 local UPOP_W      = 160
@@ -1026,17 +1046,6 @@ end
 -- autoSave removed: toggles no longer overwrite saved configs
 
 -- Auto save rebirth target/unit/multiplier only (called every time target changes)
-local function saveRebirthTarget()
-    if isLoading then return end
-    local configs = loadConfigFile()
-    configs[LAST_TARGET_KEY] = {
-        kothRebirthVal        = kothRebirthVal,
-        kothRebirthUnit       = kothRebirthUnit,
-        kothRebirthMultiplier = kothRebirthMultiplier,
-    }
-    saveConfigFile(configs)
-end
-
 local function rebuildConfigList()
     for _, c in pairs(configList:GetChildren()) do
         if c:IsA("TextButton") then c:Destroy() end
@@ -1466,4 +1475,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test1 Auto Hub v3 loaded! KOTH + Config Only")
+print("Auto Hub v3 loaded! KOTH + Config Only")
