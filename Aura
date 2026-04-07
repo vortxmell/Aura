@@ -53,8 +53,7 @@ local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
-local kothMultiplierOn   = false   -- toggle ON/OFF koth multiplier
-local kothMultiplier     = 2       -- default multiplier 2x
+local kothMultiplierOn = false
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -606,8 +605,6 @@ local kHopHitbox, kHopPill, kHopDot, kHopStroke   -- Auto Server Hop toggle
 local kHopBtn                                        -- Force Hop button
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
-local KMPillHitbox, KMPill, KMDot, KMFStroke
-local KMMinus, KMBox, KMPlus
 local kothH
 
 do
@@ -804,52 +801,6 @@ do
     kRebCount.TextColor3 = DIM; kRebCount.TextSize = 9; kRebCount.Font = Enum.Font.Gotham
     kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = R
     yR = yR + STAT_H + GAP
-
-    -- KOTH Multiplier
-    local KMFW = RIGHT_W - PAD*2
-    local KMF = Instance.new("Frame")
-    KMF.Size = UDim2.new(0, KMFW, 0, ROW_H)
-    KMF.Position = UDim2.new(0, PAD, 0, yR)
-    KMF.BackgroundColor3 = PANEL; KMF.BorderSizePixel = 0; KMF.Parent = R
-    Instance.new("UICorner", KMF).CornerRadius = UDim.new(0,6)
-    KMFStroke = Instance.new("UIStroke", KMF)
-    KMFStroke.Color = Color3.fromRGB(60,45,90); KMFStroke.Thickness = 1
-    local KMLbl = Instance.new("TextLabel")
-    KMLbl.Size = UDim2.new(0.28,0,1,0); KMLbl.Position = UDim2.new(0,6,0,0)
-    KMLbl.BackgroundTransparency = 1; KMLbl.Text = "Mult"
-    KMLbl.TextColor3 = WHITE; KMLbl.TextSize = 9; KMLbl.Font = Enum.Font.GothamBold
-    KMLbl.TextXAlignment = Enum.TextXAlignment.Left; KMLbl.Parent = KMF
-    KMPill = Instance.new("Frame")
-    KMPill.Size = UDim2.new(0,22,0,12); KMPill.Position = UDim2.new(0,KMFW*0.3,0.5,-6)
-    KMPill.BackgroundColor3 = Color3.fromRGB(40,35,55); KMPill.BorderSizePixel = 0; KMPill.Parent = KMF
-    Instance.new("UICorner", KMPill).CornerRadius = UDim.new(1,0)
-    KMDot = Instance.new("Frame")
-    KMDot.Size = UDim2.new(0,8,0,8); KMDot.Position = UDim2.new(0,2,0.5,-4)
-    KMDot.BackgroundColor3 = Color3.fromRGB(100,90,130); KMDot.BorderSizePixel = 0; KMDot.Parent = KMPill
-    Instance.new("UICorner", KMDot).CornerRadius = UDim.new(1,0)
-    KMPillHitbox = Instance.new("TextButton")
-    KMPillHitbox.Size = UDim2.new(0,30,1,0); KMPillHitbox.Position = UDim2.new(0,KMFW*0.3-4,0,0)
-    KMPillHitbox.BackgroundTransparency = 1; KMPillHitbox.Text = ""; KMPillHitbox.Parent = KMF
-    KMMinus = Instance.new("TextButton")
-    KMMinus.Size = UDim2.new(0,14,0,12); KMMinus.Position = UDim2.new(1,-68,0.5,-6)
-    KMMinus.BackgroundColor3 = Color3.fromRGB(40,35,60); KMMinus.BorderSizePixel = 0
-    KMMinus.Text = "-"; KMMinus.TextColor3 = WHITE; KMMinus.TextSize = 11
-    KMMinus.Font = Enum.Font.GothamBold; KMMinus.Parent = KMF
-    Instance.new("UICorner", KMMinus).CornerRadius = UDim.new(1,0)
-    KMBox = Instance.new("TextBox")
-    KMBox.Size = UDim2.new(0,34,0,12); KMBox.Position = UDim2.new(1,-52,0.5,-6)
-    KMBox.BackgroundColor3 = Color3.fromRGB(30,26,44); KMBox.BorderSizePixel = 0
-    KMBox.Text = tostring(kothMultiplier).."x"; KMBox.TextColor3 = WHITE
-    KMBox.TextSize = 9; KMBox.Font = Enum.Font.GothamBold
-    KMBox.ClearTextOnFocus = true; KMBox.Parent = KMF
-    Instance.new("UICorner", KMBox).CornerRadius = UDim.new(0,4)
-    KMPlus = Instance.new("TextButton")
-    KMPlus.Size = UDim2.new(0,14,0,12); KMPlus.Position = UDim2.new(1,-16,0.5,-6)
-    KMPlus.BackgroundColor3 = Color3.fromRGB(40,35,60); KMPlus.BorderSizePixel = 0
-    KMPlus.Text = "+"; KMPlus.TextColor3 = WHITE; KMPlus.TextSize = 11
-    KMPlus.Font = Enum.Font.GothamBold; KMPlus.Parent = KMF
-    Instance.new("UICorner", KMPlus).CornerRadius = UDim.new(1,0)
-    yR = yR + ROW_H + GAP
 
     kothH = math.max(yL, yR) + GAP
 end
