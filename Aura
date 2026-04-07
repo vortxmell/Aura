@@ -1,4 +1,4 @@
--- Aura ascension v3 - KOTH + Config Only
+-- Auto Hub v3 - KOTH + Config Only
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -959,7 +959,8 @@ kRebMultInc.MouseButton1Click:Connect(function() changeMultiplier( 0.1) end)
 -- CONFIG SYSTEM
 -- ============================================================
 local CONFIG_FILE  = "autohub_config.json"
-local AUTOLOAD_KEY = "__autoload__"
+local AUTOLOAD_KEY    = "__autoload__"
+local LAST_TARGET_KEY = "__lasttarget__"
 local hasFS        = false
 local selectedCfg  = nil
 local isLoading    = false
@@ -1036,12 +1037,12 @@ end
 -- Auto save rebirth target/unit/multiplier only (called every time target changes)
 local function saveRebirthTarget()
     if isLoading then return end
-    if not selectedCfg then return end
     local configs = loadConfigFile()
-    if not configs[selectedCfg] then return end
-    configs[selectedCfg].kothRebirthVal        = kothRebirthVal
-    configs[selectedCfg].kothRebirthUnit       = kothRebirthUnit
-    configs[selectedCfg].kothRebirthMultiplier = kothRebirthMultiplier
+    configs[LAST_TARGET_KEY] = {
+        kothRebirthVal        = kothRebirthVal,
+        kothRebirthUnit       = kothRebirthUnit,
+        kothRebirthMultiplier = kothRebirthMultiplier,
+    }
     saveConfigFile(configs)
 end
 
@@ -1055,7 +1056,7 @@ local function rebuildConfigList()
     btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20,100,30) or Color3.fromRGB(60,40,10)
     local hasAny = false
     for name, _ in pairs(configs) do
-        if name ~= AUTOLOAD_KEY then
+        if name ~= AUTOLOAD_KEY and name ~= LAST_TARGET_KEY then
             hasAny = true
             local isAuto = autoLoadName == name
             local isSel  = selectedCfg == name
@@ -1321,7 +1322,7 @@ btnSave.MouseButton1Click:Connect(function()
     if name == "" then setConfigStatus("⚠ Enter config name!", true); return end
     local configs = loadConfigFile()
     local count = 0
-    for k,_ in pairs(configs) do if k ~= AUTOLOAD_KEY then count = count + 1 end end
+    for k,_ in pairs(configs) do if k ~= AUTOLOAD_KEY and k ~= LAST_TARGET_KEY then count = count + 1 end end
     if count >= 10 and not configs[name] then setConfigStatus("⚠ Max 10 configs!", true); return end
     configs[name] = getCurrentSettings(); saveConfigFile(configs)
     selectedCfg = name; configNameBox.Text = ""
@@ -1438,6 +1439,16 @@ task.spawn(function()
         local autoName = configs[AUTOLOAD_KEY]
         if configs[autoName] then
             applySettings(configs[autoName])
+            -- Override target with last used values if exist
+            local lt = configs[LAST_TARGET_KEY]
+            if lt then
+                isLoading = true
+                if lt.kothRebirthVal        then kothRebirthVal        = lt.kothRebirthVal;        kRebInput.Text   = tostring(kothRebirthVal) end
+                if lt.kothRebirthUnit       then kothRebirthUnit       = lt.kothRebirthUnit;       kRebUnitBtn.Text = kothRebirthUnit .. " ▾" end
+                if lt.kothRebirthMultiplier then kothRebirthMultiplier = lt.kothRebirthMultiplier; kRebMultInput.Text = tostring(kothRebirthMultiplier) end
+                updateKRebTarget()
+                isLoading = false
+            end
             selectedCfg = autoName
             setConfigStatus("⚡ Auto loaded: " .. autoName)
             rebuildConfigList()
@@ -1464,4 +1475,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura ascension v3 loaded! KOTH + Config Only")
+print("Auto Hub v3 loaded! KOTH + Config Only")
