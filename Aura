@@ -1,4 +1,4 @@
--- Auto Hub v3 - KOTH + Config Only
+-- Aura ascension v3 - KOTH + Config Only
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -804,6 +804,8 @@ local function updateKRebTarget()
             break
         end
     end
+    -- Auto save target to current selected config (skip during load)
+    if saveRebirthTarget then saveRebirthTarget() end
 end
 
 local UPOP_W      = 160
@@ -1030,6 +1032,18 @@ local function applySettings(s)
 end
 
 -- autoSave removed: toggles no longer overwrite saved configs
+
+-- Auto save rebirth target/unit/multiplier only (called every time target changes)
+local function saveRebirthTarget()
+    if isLoading then return end
+    if not selectedCfg then return end
+    local configs = loadConfigFile()
+    if not configs[selectedCfg] then return end
+    configs[selectedCfg].kothRebirthVal        = kothRebirthVal
+    configs[selectedCfg].kothRebirthUnit       = kothRebirthUnit
+    configs[selectedCfg].kothRebirthMultiplier = kothRebirthMultiplier
+    saveConfigFile(configs)
+end
 
 local function rebuildConfigList()
     for _, c in pairs(configList:GetChildren()) do
@@ -1450,4 +1464,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Auto Hub v3 loaded! KOTH + Config Only")
+print("Aura ascension v3 loaded! KOTH + Config Only")
