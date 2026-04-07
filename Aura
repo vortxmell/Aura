@@ -1,6 +1,4 @@
-print("[AutoHub] Script starting...")
-
--- Auto Hub v3 - 2 Column Layout + Auto Server Hop + KOTH Rebirth Multiplier
+-- Auto Hub v3 - 2 Column Layout + Auto Server Hop
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -48,16 +46,16 @@ local threshold          = 2
 local multiplier         = 2
 local comboTarget        = nil
 local autoKOTH           = false
-local autoServerHop      = true
+local autoServerHop      = true   -- NEW: default ON
 local forceHop           = false
 local kothHopping        = false
 local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
-local kothRebMult        = 2
-local kothRebMultOn      = false
-local kothRebirthCount   = 0
+local kothRebirthVal     = 500
+local kothMultiplierOn   = false   -- toggle ON/OFF koth multiplier
+local kothMultiplier     = 2       -- default multiplier 2x
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -114,10 +112,12 @@ local RED     = Color3.fromRGB(220, 80, 80)
 local DARK    = Color3.fromRGB(10, 10, 14)
 local PANEL   = Color3.fromRGB(18, 16, 26)
 
+-- Window width: 320px, content = 320 - 36(tab) - 1(div) = 283px
+-- Left col: 130px, vert divider: 1px, right col: 152px
 local CONTENT_W = 283
 local LEFT_W    = 130
 local RIGHT_W   = 152
-local VDIV_X    = TAB_W + 1 + LEFT_W
+local VDIV_X    = TAB_W + 1 + LEFT_W  -- absolute X of vertical divider in Main
 
 -- --- ScreenGui ---
 local ScreenGui = Instance.new("ScreenGui")
@@ -128,7 +128,7 @@ ScreenGui.DisplayOrder = 999
 local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 if not ok then ScreenGui.Parent = player.PlayerGui end
 
--- --- Main Frame ---
+-- --- Main Frame (width 320, height set later) ---
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 320, 0, 300)
 Main.Position = UDim2.new(0, 16, 0.5, -150)
@@ -272,6 +272,7 @@ ContentArea.BorderSizePixel = 0
 ContentArea.ClipsDescendants = true
 ContentArea.Parent = Main
 
+-- --- Helper: make a plain panel (no scroll) ---
 local function makePanel()
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 1, 0)
@@ -285,6 +286,7 @@ local PanelFarm   = makePanel(); PanelFarm.Visible   = false
 local PanelConfig = makePanel(); PanelConfig.Visible = false
 local PanelKOTH   = makePanel()
 
+-- --- Vertical divider helper for panels ---
 local function makeVDiv(panel)
     local d = Instance.new("Frame")
     d.Size = UDim2.new(0, 1, 1, 0)
@@ -294,6 +296,7 @@ local function makeVDiv(panel)
     d.Parent = panel
 end
 
+-- --- Left/Right column frames ---
 local function makeColumns(panel)
     local L = Instance.new("Frame")
     L.Size = UDim2.new(0, LEFT_W, 1, 0)
@@ -335,11 +338,14 @@ end
 
 -- ============================================================
 -- FARM PANEL - 2 Column
+-- Left:  INDIVIDUAL toggles + UTILITY
+-- Right: COMBO section + stats
 -- ============================================================
 do
     local L, R = makeColumns(PanelFarm)
     local PAD = 5
 
+    -- helpers scoped to Farm
     local function makeSec(parent, text, y)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(1, -PAD*2, 0, SEC_H)
@@ -400,7 +406,9 @@ do
         return y + 1 + GAP
     end
 
+    -- ---- LEFT COLUMN ----
     local yL = GAP
+    -- Area status
     local StatusLabel
     StatusLabel, yL = makeStatLbl(L, "Area: —", WHITE, yL)
     yL = makeHDiv(L, yL, LEFT_W)
@@ -416,12 +424,15 @@ do
     local ZoneBtn, ZonePill, ZoneDot, ZoneStroke
     ZoneBtn, ZonePill, ZoneDot, ZoneStroke, yL = makeToggle(L, "Zone Guard", yL)
 
+    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeSec(R, "COMBO", yR)
 
+    -- Train+Rebirth toggle
     local ComboBtn, ComboPill, ComboDot, ComboStroke
     ComboBtn, ComboPill, ComboDot, ComboStroke, yR = makeToggle(R, "Train+Rebirth", yR)
 
+    -- Target row
     local iw = RIGHT_W - PAD*2
     local TgFrame = Instance.new("Frame")
     TgFrame.Size = UDim2.new(0, iw, 0, ROW_H)
@@ -450,6 +461,7 @@ do
     TargetBtn.Text = ""; TargetBtn.Parent = TgFrame
     yR = yR + ROW_H + GAP
 
+    -- Threshold row (−/input/+)
     local function makeStepRow(parent, labelText, defVal, y)
         local fw = RIGHT_W - PAD*2
         local F = Instance.new("Frame")
@@ -500,6 +512,7 @@ do
         Lbl.BackgroundTransparency = 1; Lbl.Text = labelText
         Lbl.TextColor3 = WHITE; Lbl.TextSize = 9; Lbl.Font = Enum.Font.GothamBold
         Lbl.TextXAlignment = Enum.TextXAlignment.Left; Lbl.Parent = F
+        -- pill toggle
         local Pill = Instance.new("Frame")
         Pill.Size = UDim2.new(0,22,0,12); Pill.Position = UDim2.new(0,fw*0.3,0.5,-6)
         Pill.BackgroundColor3 = Color3.fromRGB(40,35,55); Pill.BorderSizePixel = 0; Pill.Parent = F
@@ -511,6 +524,7 @@ do
         local PillHitbox = Instance.new("TextButton")
         PillHitbox.Size = UDim2.new(0,30,1,0); PillHitbox.Position = UDim2.new(0,fw*0.3-4,0,0)
         PillHitbox.BackgroundTransparency = 1; PillHitbox.Text = ""; PillHitbox.Parent = F
+        -- minus/box/plus
         local Minus = Instance.new("TextButton")
         Minus.Size = UDim2.new(0,14,0,12); Minus.Position = UDim2.new(1,-68,0.5,-6)
         Minus.BackgroundColor3 = Color3.fromRGB(40,35,60); Minus.BorderSizePixel = 0
@@ -549,6 +563,7 @@ do
 
     local farmH = math.max(yL, yR) + GAP
 
+    -- expose to outer scope
     _G._AH_Farm = {
         StatusLabel=StatusLabel, TrainBtn=TrainBtn, TrainPill=TrainPill, TrainDot=TrainDot, TrainStroke=TrainStroke,
         RebirthBtn=RebirthBtn, RebirthPill=RebirthPill, RebirthDot=RebirthDot, RebirthStroke=RebirthStroke,
@@ -583,21 +598,22 @@ _G._AH_Farm = nil
 
 -- ============================================================
 -- KOTH PANEL - 2 Column
+-- Left:  STATUS + MY STATS
+-- Right: AUTO KOTH controls + AUTO REBIRTH
 -- ============================================================
 local kStatusDot, kRowStatus, kRowKing, kRowKingAura, kRowMyAura, kRowResult, kRowMyRank
 local kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, kAutoStatus
-local kHopHitbox, kHopPill, kHopDot, kHopStroke
-local kHopBtn
+local kHopHitbox, kHopPill, kHopDot, kHopStroke   -- Auto Server Hop toggle
+local kHopBtn                                        -- Force Hop button
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
-local kRebMultHitbox, kRebMultPill, kRebMultDot, kRebMultStroke
-local kRebMultMinus, kRebMultBox, kRebMultPlus
 local kothH
 
 do
     local L, R = makeColumns(PanelKOTH)
     local PAD = 5
 
+    -- helpers
     local function makeSec(parent, text, y, w)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(0, (w or LEFT_W)-PAD*2, 0, SEC_H)
@@ -676,14 +692,17 @@ do
         return l, y + STAT_H + GAP
     end
 
+    -- ---- LEFT COLUMN ----
     local yL = GAP
 
+    -- status dot
     kStatusDot = Instance.new("Frame")
     kStatusDot.Size = UDim2.new(0,8,0,8); kStatusDot.Position = UDim2.new(0,PAD,0,yL+2)
     kStatusDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kStatusDot.BorderSizePixel = 0
     kStatusDot.Parent = L
     Instance.new("UICorner", kStatusDot).CornerRadius = UDim.new(1,0)
 
+    -- section label offset for dot
     local secLbl = Instance.new("TextLabel")
     secLbl.Size = UDim2.new(0, LEFT_W-PAD*2-10, 0, SEC_H)
     secLbl.Position = UDim2.new(0, PAD+12, 0, yL)
@@ -702,14 +721,18 @@ do
     yL = makeSec(L, "MY STATS", yL)
     kRowMyRank,   yL = makeKRow(L, "My Rank:", false, yL)
 
+    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeSec(R, "AUTO KOTH", yR, RIGHT_W)
 
     kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, yR = makeToggleR(R, "Auto Enter KOTH", yR)
 
+    -- Auto Server Hop toggle (NEW)
     kHopHitbox, kHopPill, kHopDot, kHopStroke, yR = makeToggleR(R, "Auto Server Hop", yR)
+    -- default ON
     setToggle(kHopPill, kHopDot, kHopStroke, true)
 
+    -- status label
     kAutoStatus = Instance.new("TextLabel")
     kAutoStatus.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, STAT_H)
     kAutoStatus.Position = UDim2.new(0, PAD, 0, yR)
@@ -718,6 +741,7 @@ do
     kAutoStatus.TextXAlignment = Enum.TextXAlignment.Left; kAutoStatus.Parent = R
     yR = yR + STAT_H + GAP
 
+    -- Force Hop button
     kHopBtn = Instance.new("TextButton")
     kHopBtn.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, 18)
     kHopBtn.Position = UDim2.new(0, PAD, 0, yR)
@@ -728,11 +752,13 @@ do
     Instance.new("UICorner", kHopBtn).CornerRadius = UDim.new(0,6)
     yR = yR + 18 + GAP
 
+    -- Auto Rebirth section
     local yRd = makeHDiv(R, yR, RIGHT_W)
     yR = makeSec(R, "AUTO REBIRTH", yRd, RIGHT_W)
 
     kRebHitbox, kRebPill, kRebDot, kRebStroke, yR = makeToggleR(R, "Auto Rebirth", yR)
 
+    -- Input row
     local iw = RIGHT_W - PAD*2
     local kRebInputRow = Instance.new("Frame")
     kRebInputRow.Size = UDim2.new(0, iw, 0, 20)
@@ -778,64 +804,13 @@ do
     kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = R
     yR = yR + STAT_H + GAP
 
-    local kRebMultRow = Instance.new("Frame")
-    kRebMultRow.Size = UDim2.new(0, iw, 0, ROW_H)
-    kRebMultRow.Position = UDim2.new(0, PAD, 0, yR)
-    kRebMultRow.BackgroundColor3 = PANEL; kRebMultRow.BorderSizePixel = 0; kRebMultRow.Parent = R
-    Instance.new("UICorner", kRebMultRow).CornerRadius = UDim.new(0,6)
-    kRebMultStroke = Instance.new("UIStroke", kRebMultRow)
-    kRebMultStroke.Color = Color3.fromRGB(60,45,90); kRebMultStroke.Thickness = 1
-
-    local kRebMultLbl = Instance.new("TextLabel")
-    kRebMultLbl.Size = UDim2.new(0,30,1,0); kRebMultLbl.Position = UDim2.new(0,4,0,0)
-    kRebMultLbl.BackgroundTransparency = 1; kRebMultLbl.Text = "Mult:"
-    kRebMultLbl.TextColor3 = WHITE; kRebMultLbl.TextSize = 9; kRebMultLbl.Font = Enum.Font.GothamBold
-    kRebMultLbl.TextXAlignment = Enum.TextXAlignment.Left; kRebMultLbl.Parent = kRebMultRow
-
-    kRebMultPill = Instance.new("Frame")
-    kRebMultPill.Size = UDim2.new(0,22,0,12); kRebMultPill.Position = UDim2.new(0,34,0.5,-6)
-    kRebMultPill.BackgroundColor3 = Color3.fromRGB(40,35,55); kRebMultPill.BorderSizePixel = 0
-    kRebMultPill.Parent = kRebMultRow
-    Instance.new("UICorner", kRebMultPill).CornerRadius = UDim.new(1,0)
-
-    kRebMultDot = Instance.new("Frame")
-    kRebMultDot.Size = UDim2.new(0,8,0,8); kRebMultDot.Position = UDim2.new(0,2,0.5,-4)
-    kRebMultDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebMultDot.BorderSizePixel = 0
-    kRebMultDot.Parent = kRebMultPill
-    Instance.new("UICorner", kRebMultDot).CornerRadius = UDim.new(1,0)
-
-    kRebMultHitbox = Instance.new("TextButton")
-    kRebMultHitbox.Size = UDim2.new(0,30,1,0); kRebMultHitbox.Position = UDim2.new(0,30,0,0)
-    kRebMultHitbox.BackgroundTransparency = 1; kRebMultHitbox.Text = ""; kRebMultHitbox.Parent = kRebMultRow
-
-    kRebMultMinus = Instance.new("TextButton")
-    kRebMultMinus.Size = UDim2.new(0,14,0,12); kRebMultMinus.Position = UDim2.new(1,-68,0.5,-6)
-    kRebMultMinus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultMinus.BorderSizePixel = 0
-    kRebMultMinus.Text = "−"; kRebMultMinus.TextColor3 = WHITE; kRebMultMinus.TextSize = 11
-    kRebMultMinus.Font = Enum.Font.GothamBold; kRebMultMinus.Parent = kRebMultRow
-    Instance.new("UICorner", kRebMultMinus).CornerRadius = UDim.new(1,0)
-
-    kRebMultBox = Instance.new("TextBox")
-    kRebMultBox.Size = UDim2.new(0,34,0,12); kRebMultBox.Position = UDim2.new(1,-52,0.5,-6)
-    kRebMultBox.BackgroundColor3 = Color3.fromRGB(30,26,44); kRebMultBox.BorderSizePixel = 0
-    kRebMultBox.Text = formatThresh(kothRebMult); kRebMultBox.TextColor3 = WHITE
-    kRebMultBox.TextSize = 9; kRebMultBox.Font = Enum.Font.GothamBold
-    kRebMultBox.ClearTextOnFocus = true; kRebMultBox.Parent = kRebMultRow
-    Instance.new("UICorner", kRebMultBox).CornerRadius = UDim.new(0,4)
-
-    kRebMultPlus = Instance.new("TextButton")
-    kRebMultPlus.Size = UDim2.new(0,14,0,12); kRebMultPlus.Position = UDim2.new(1,-16,0.5,-6)
-    kRebMultPlus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultPlus.BorderSizePixel = 0
-    kRebMultPlus.Text = "+"; kRebMultPlus.TextColor3 = WHITE; kRebMultPlus.TextSize = 11
-    kRebMultPlus.Font = Enum.Font.GothamBold; kRebMultPlus.Parent = kRebMultRow
-    Instance.new("UICorner", kRebMultPlus).CornerRadius = UDim.new(1,0)
-
-    yR = yR + ROW_H + GAP
     kothH = math.max(yL, yR) + GAP
 end
 
 -- ============================================================
 -- CONFIG PANEL - 2 Column
+-- Left:  Name input + Save button + status
+-- Right: Saved configs list + Load/Delete/AutoLoad
 -- ============================================================
 local configNameBox, btnSave, configList, configListLayout
 local btnLoad, btnDelete, btnAutoLoad, configStatus
@@ -857,6 +832,7 @@ do
         return y + 12 + GAP
     end
 
+    -- ---- LEFT COLUMN ----
     local yL = GAP
     yL = makeLbl(L, "💾 CONFIG", yL, WHITE, 10)
 
@@ -898,6 +874,7 @@ do
     configStatus.Parent = L
     yL = yL + 12 + GAP
 
+    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeLbl(R, "Saved configs:", yR, DIM, 8, RIGHT_W)
 
@@ -946,14 +923,14 @@ do
 end
 
 -- ============================================================
--- RESIZE MAIN
+-- RESIZE MAIN to tallest panel
 -- ============================================================
 local fullH = PAD_TOP + math.max(farmH, kothH, configH) + GAP
 Main.Size = UDim2.new(0, 320, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
 -- ============================================================
--- KOTH LOGIC
+-- KOTH LOGIC (unchanged)
 -- ============================================================
 local kothHitbox = nil
 pcall(function()
@@ -1060,7 +1037,7 @@ TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
 switchTab("koth")
 
 -- ============================================================
--- POPUP (Rebirth Target selector)
+-- POPUP (Rebirth Target selector) - unchanged logic
 -- ============================================================
 local POPUP_W    = 200
 local POPUP_ITEM_H = 20
@@ -1183,10 +1160,6 @@ TargetBtn.MouseButton1Click:Connect(openPopup)
 local kRebUnitUnits  = {"Dd","Td","Qad","Qid","Sxd","Spd","Ocd","Nod","Uvg"}
 local kRebUnitValues = {1e39,1e42,1e45,1e48,1e51,1e54,1e57,1e60,1e63}
 
--- ============================================================
--- FIX: updateKRebTarget & normalizeKRebTarget declared BEFORE
--- any function or loop that calls them
--- ============================================================
 local function updateKRebTarget()
     local n = tonumber(kRebInput.Text)
     if n and n > 0 then kothRebirthVal = n end
@@ -1198,188 +1171,6 @@ local function updateKRebTarget()
     end
 end
 
-local function normalizeKRebTarget()
-    local currentUnitVal = 1e39
-    for i, u in ipairs(kRebUnitUnits) do
-        if u == kothRebirthUnit then
-            currentUnitVal = kRebUnitValues[i]
-            break
-        end
-    end
-    local rawTotal = kothRebirthVal * currentUnitVal
-    local bestIdx = 1
-    for i = #kRebUnitUnits, 1, -1 do
-        if rawTotal >= kRebUnitValues[i] then
-            bestIdx = i; break
-        end
-    end
-    if bestIdx > #kRebUnitUnits then bestIdx = #kRebUnitUnits end
-    kothRebirthUnit   = kRebUnitUnits[bestIdx]
-    kothRebirthVal    = rawTotal / kRebUnitValues[bestIdx]
-    kothRebirthVal    = math.floor(kothRebirthVal * 100 + 0.5) / 100
-    kothRebirthTarget = rawTotal
-    if rawTotal > kRebUnitValues[#kRebUnitUnits] then
-        kothRebirthVal  = math.floor((rawTotal / kRebUnitValues[#kRebUnitUnits]) * 100 + 0.5) / 100
-        kothRebirthUnit = kRebUnitUnits[#kRebUnitUnits]
-        kothRebirthTarget = rawTotal
-    end
-    kRebInput.Text   = tostring(kothRebirthVal)
-    kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
-end
-
--- ============================================================
--- CONFIG SYSTEM - declared BEFORE toggle events & loops
--- ============================================================
-local CONFIG_FILE  = "autohub_config.json"
-local AUTOLOAD_KEY = "__autoload__"
-local hasFS        = false
-local selectedCfg  = nil
-local isLoading    = false
-
-pcall(function()
-    hasFS = type(writefile) == "function" and type(readfile) == "function"
-end)
-
-local function setConfigStatus(msg, isErr)
-    configStatus.Text = msg
-    configStatus.TextColor3 = isErr and RED or GREEN
-    task.delay(3, function() if configStatus.Text == msg then configStatus.Text = "" end end)
-end
-
-local function loadConfigFile()
-    if not hasFS then return {} end
-    local ok2, data = pcall(readfile, CONFIG_FILE)
-    if not ok2 or not data or data == "" then return {} end
-    local ok3, t = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
-    return (ok3 and t) or {}
-end
-
-local function saveConfigFile(configs)
-    if not hasFS then setConfigStatus("⚠ Executor tak support!", true); return end
-    pcall(function()
-        writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(configs))
-    end)
-end
-
-local function getCurrentSettings()
-    return {
-        autoTraining    = autoTraining,
-        autoRebirth     = autoRebirth,
-        autoCombo       = autoCombo,
-        zoneGuard       = zoneGuard,
-        multiplierOn    = multiplierOn,
-        threshold       = threshold,
-        multiplier      = multiplier,
-        comboTargetName = comboTarget and comboTarget.name or nil,
-        autoKOTH        = autoKOTH,
-        autoServerHop   = autoServerHop,
-        autoKothRebirth = autoKothRebirth,
-        kothRebirthVal  = kothRebirthVal,
-        kothRebirthUnit = kothRebirthUnit,
-        kothRebMult     = kothRebMult,
-        kothRebMultOn   = kothRebMultOn,
-    }
-end
-
-local function applySettings(s)
-    if not s then return end
-    if s.threshold  ~= nil then threshold  = s.threshold  end
-    if s.multiplier ~= nil then multiplier = s.multiplier end
-    if s.comboTargetName then
-        for _,a in ipairs(areas) do
-            if a.name == s.comboTargetName then comboTarget = a; break end
-        end
-    end
-    if s.multiplierOn    ~= nil then multiplierOn    = s.multiplierOn;    setToggle(MultPill,    MultDot,    MultStroke,    multiplierOn)    end
-    if s.autoTraining    ~= nil then autoTraining    = s.autoTraining;    setToggle(TrainPill,   TrainDot,   TrainStroke,   autoTraining)    end
-    if s.autoRebirth     ~= nil then autoRebirth     = s.autoRebirth;     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)     end
-    if s.autoCombo       ~= nil then autoCombo       = s.autoCombo;       setToggle(ComboPill,   ComboDot,   ComboStroke,   autoCombo)       end
-    if s.zoneGuard       ~= nil then zoneGuard       = s.zoneGuard;       setToggle(ZonePill,    ZoneDot,    ZoneStroke,    zoneGuard)       end
-    if s.autoKOTH        ~= nil then
-        autoKOTH = s.autoKOTH
-        setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
-        kAutoStatus.Text = autoKOTH and "🔄 Running..." or "💤 Idle"
-        kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
-    end
-    if s.autoServerHop ~= nil then
-        autoServerHop = s.autoServerHop
-        setToggle(kHopPill, kHopDot, kHopStroke, autoServerHop)
-    end
-    if s.autoKothRebirth ~= nil then
-        autoKothRebirth = s.autoKothRebirth
-        setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
-        kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
-        kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
-    end
-    if s.kothRebirthVal  ~= nil then kothRebirthVal  = s.kothRebirthVal;  kRebInput.Text = tostring(kothRebirthVal) end
-    if s.kothRebirthUnit ~= nil then
-        kothRebirthUnit = s.kothRebirthUnit
-        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
-    end
-    if s.kothRebMult ~= nil then
-        kothRebMult = s.kothRebMult
-        kRebMultBox.Text = formatThresh(kothRebMult)
-    end
-    if s.kothRebMultOn ~= nil then
-        kothRebMultOn = s.kothRebMultOn
-        setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
-    end
-    updateKRebTarget()
-    ThreshBox.Text = formatThresh(threshold); MultBox.Text = formatThresh(multiplier)
-    updateStatus()
-end
-
--- FIX: autoSave declared BEFORE any toggle events or loops that call it
-local function autoSave()
-    task.spawn(function()
-        task.wait(0.5)
-        if isLoading then return end
-        local configs = loadConfigFile()
-        if selectedCfg and configs[selectedCfg] then
-            configs[selectedCfg] = getCurrentSettings()
-            saveConfigFile(configs)
-        end
-    end)
-end
-
-local function rebuildConfigList()
-    for _, c in pairs(configList:GetChildren()) do
-        if c:IsA("TextButton") then c:Destroy() end
-    end
-    local configs = loadConfigFile()
-    local autoLoadName = configs[AUTOLOAD_KEY]
-    btnAutoLoad.Text = autoLoadName and ("⚡ Auto: "..autoLoadName) or "⚡ Auto Load: None"
-    btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20,100,30) or Color3.fromRGB(60,40,10)
-    local hasAny = false
-    for name, _ in pairs(configs) do
-        if name ~= AUTOLOAD_KEY then
-            hasAny = true
-            local isAuto = autoLoadName == name
-            local isSel  = selectedCfg == name
-            local item = Instance.new("TextButton")
-            item.Size = UDim2.new(1,0,0,22)
-            item.BackgroundColor3 = isSel and Color3.fromRGB(60,40,100) or Color3.fromRGB(25,20,38)
-            item.BackgroundTransparency = isSel and 0 or 0.3; item.BorderSizePixel = 0
-            item.Text = (isAuto and "⚡ " or "  ") .. name
-            item.TextColor3 = isSel and WHITE or (isAuto and GREEN or DIM)
-            item.TextSize = 10; item.Font = Enum.Font.Gotham
-            item.TextXAlignment = Enum.TextXAlignment.Left; item.Parent = configList
-            Instance.new("UICorner", item).CornerRadius = UDim.new(0,4)
-            item.MouseButton1Click:Connect(function() selectedCfg = name; rebuildConfigList() end)
-        end
-    end
-    if not hasAny then
-        local empty = Instance.new("TextLabel")
-        empty.Size = UDim2.new(1,0,0,22); empty.BackgroundTransparency = 1
-        empty.Text = "  No configs saved"; empty.TextColor3 = DIM
-        empty.TextSize = 9; empty.Font = Enum.Font.Gotham
-        empty.TextXAlignment = Enum.TextXAlignment.Left; empty.Parent = configList
-    end
-end
-
--- ============================================================
--- UNIT PICKER UI (built after updateKRebTarget is declared)
--- ============================================================
 local UPOP_W      = 160
 local UPOP_ITEM_H = 22
 local UPOP_H      = 32 + (#kRebUnitUnits*(UPOP_ITEM_H+2)) + 32
@@ -1506,7 +1297,146 @@ kRebInput.FocusLost:Connect(function()
 end)
 
 -- ============================================================
--- SERVER HOP FUNCTION (after autoSave is declared)
+-- CONFIG SYSTEM
+-- ============================================================
+local CONFIG_FILE  = "autohub_config.json"
+local AUTOLOAD_KEY = "__autoload__"
+local hasFS        = false
+local selectedCfg  = nil
+local isLoading    = false  -- guard: prevent autoSave from overwriting during load
+
+pcall(function()
+    hasFS = type(writefile) == "function" and type(readfile) == "function"
+end)
+
+local function setConfigStatus(msg, isErr)
+    configStatus.Text = msg
+    configStatus.TextColor3 = isErr and RED or GREEN
+    task.delay(3, function() if configStatus.Text == msg then configStatus.Text = "" end end)
+end
+
+local function loadConfigFile()
+    if not hasFS then return {} end
+    local ok2, data = pcall(readfile, CONFIG_FILE)
+    if not ok2 or not data or data == "" then return {} end
+    local ok3, t = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
+    return (ok3 and t) or {}
+end
+
+local function saveConfigFile(configs)
+    if not hasFS then setConfigStatus("⚠ Executor tak support!", true); return end
+    pcall(function()
+        writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(configs))
+    end)
+end
+
+local function getCurrentSettings()
+    return {
+        autoTraining    = autoTraining,
+        autoRebirth     = autoRebirth,
+        autoCombo       = autoCombo,
+        zoneGuard       = zoneGuard,
+        multiplierOn    = multiplierOn,
+        threshold       = threshold,
+        multiplier      = multiplier,
+        comboTargetName = comboTarget and comboTarget.name or nil,
+        autoKOTH        = autoKOTH,
+        autoServerHop   = autoServerHop,
+        autoKothRebirth = autoKothRebirth,
+        kothRebirthVal  = kothRebirthVal,
+        kothRebirthUnit = kothRebirthUnit,
+    }
+end
+
+local function applySettings(s)
+    if not s then return end
+    if s.threshold  ~= nil then threshold  = s.threshold  end
+    if s.multiplier ~= nil then multiplier = s.multiplier end
+    if s.comboTargetName then
+        for _,a in ipairs(areas) do
+            if a.name == s.comboTargetName then comboTarget = a; break end
+        end
+    end
+    if s.multiplierOn    ~= nil then multiplierOn    = s.multiplierOn;    setToggle(MultPill,    MultDot,    MultStroke,    multiplierOn)    end
+    if s.autoTraining    ~= nil then autoTraining    = s.autoTraining;    setToggle(TrainPill,   TrainDot,   TrainStroke,   autoTraining)    end
+    if s.autoRebirth     ~= nil then autoRebirth     = s.autoRebirth;     setToggle(RebirthPill, RebirthDot, RebirthStroke, autoRebirth)     end
+    if s.autoCombo       ~= nil then autoCombo       = s.autoCombo;       setToggle(ComboPill,   ComboDot,   ComboStroke,   autoCombo)       end
+    if s.zoneGuard       ~= nil then zoneGuard       = s.zoneGuard;       setToggle(ZonePill,    ZoneDot,    ZoneStroke,    zoneGuard)       end
+    if s.autoKOTH        ~= nil then
+        autoKOTH = s.autoKOTH
+        setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
+        kAutoStatus.Text = autoKOTH and "🔄 Running..." or "💤 Idle"
+        kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
+    end
+    if s.autoServerHop ~= nil then
+        autoServerHop = s.autoServerHop
+        setToggle(kHopPill, kHopDot, kHopStroke, autoServerHop)
+    end
+    if s.autoKothRebirth ~= nil then
+        autoKothRebirth = s.autoKothRebirth
+        setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
+        kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
+        kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
+    end
+    if s.kothRebirthVal  ~= nil then kothRebirthVal  = s.kothRebirthVal;  kRebInput.Text = tostring(kothRebirthVal) end
+    if s.kothRebirthUnit ~= nil then
+        kothRebirthUnit = s.kothRebirthUnit
+        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
+    end
+    updateKRebTarget()
+    ThreshBox.Text = formatThresh(threshold); MultBox.Text = formatThresh(multiplier)
+    updateStatus()
+end
+
+local function autoSave()
+    task.spawn(function()
+        task.wait(0.5)
+        if isLoading then return end  -- skip if load just happened (prevent race condition)
+        local configs = loadConfigFile()
+        if selectedCfg and configs[selectedCfg] then
+            configs[selectedCfg] = getCurrentSettings()
+            saveConfigFile(configs)
+        end
+    end)
+end
+
+local function rebuildConfigList()
+    for _, c in pairs(configList:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    local configs = loadConfigFile()
+    local autoLoadName = configs[AUTOLOAD_KEY]
+    btnAutoLoad.Text = autoLoadName and ("⚡ Auto: "..autoLoadName) or "⚡ Auto Load: None"
+    btnAutoLoad.BackgroundColor3 = autoLoadName and Color3.fromRGB(20,100,30) or Color3.fromRGB(60,40,10)
+    local hasAny = false
+    for name, _ in pairs(configs) do
+        if name ~= AUTOLOAD_KEY then
+            hasAny = true
+            local isAuto = autoLoadName == name
+            local isSel  = selectedCfg == name
+            local item = Instance.new("TextButton")
+            item.Size = UDim2.new(1,0,0,22)
+            item.BackgroundColor3 = isSel and Color3.fromRGB(60,40,100) or Color3.fromRGB(25,20,38)
+            item.BackgroundTransparency = isSel and 0 or 0.3; item.BorderSizePixel = 0
+            item.Text = (isAuto and "⚡ " or "  ") .. name
+            item.TextColor3 = isSel and WHITE or (isAuto and GREEN or DIM)
+            item.TextSize = 10; item.Font = Enum.Font.Gotham
+            item.TextXAlignment = Enum.TextXAlignment.Left; item.Parent = configList
+            Instance.new("UICorner", item).CornerRadius = UDim.new(0,4)
+            item.MouseButton1Click:Connect(function() selectedCfg = name; rebuildConfigList() end)
+        end
+    end
+    if not hasAny then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1,0,0,22); empty.BackgroundTransparency = 1
+        empty.Text = "  No configs saved"; empty.TextColor3 = DIM
+        empty.TextSize = 9; empty.Font = Enum.Font.Gotham
+        empty.TextXAlignment = Enum.TextXAlignment.Left; empty.Parent = configList
+    end
+end
+
+-- ============================================================
+-- SERVER HOP FUNCTION
 -- ============================================================
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
@@ -1519,18 +1449,21 @@ local function hopToLeastPopulated(reason)
         local currentJobId = game.JobId
         local bestServer   = nil
         local bestCount    = math.huge
-        local soloServer   = nil
-        local allServers   = {}
+        local soloServer   = nil   -- priority: server dengan exactly 1 player
+        local allServers   = {}    -- fallback pool
         local cursor       = ""
         local totalScanned = 0
 
+        -- Scan up to 5 pages (max 500 servers)
         for page = 1, 5 do
             kAutoStatus.Text = string.format("🔍 Scanning page %d/5...", page)
+
             local url = string.format(
                 "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
                 placeId
             )
             if cursor ~= "" then url = url .. "&cursor=" .. cursor end
+
             local ok2, result = pcall(function()
                 return (typeof(request) == "function"
                     and request({Url = url, Method = "GET"}).Body)
@@ -1538,113 +1471,171 @@ local function hopToLeastPopulated(reason)
             end)
             if not ok2 then
                 kAutoStatus.Text = "⚠ API error pg " .. page
-                task.wait(0.5); break
+                task.wait(0.5)
+                break
             end
+
             local ok3, data = pcall(function()
                 return game:GetService("HttpService"):JSONDecode(result)
             end)
             if not ok3 or not data or not data.data then break end
+
             for _, server in ipairs(data.data) do
-                if server.id ~= currentJobId and server.playing ~= nil and server.playing >= 1 then
+                -- Skip server semasa dan server kosong (ghost server)
+                if server.id ~= currentJobId
+                    and server.playing ~= nil
+                    and server.playing >= 1
+                then
                     totalScanned = totalScanned + 1
                     table.insert(allServers, server)
-                    if server.playing == 1 and soloServer == nil then soloServer = server end
-                    if server.playing < bestCount then bestCount = server.playing; bestServer = server end
+
+                    -- Priority 1: server solo (1 player je)
+                    if server.playing == 1 and soloServer == nil then
+                        soloServer = server
+                    end
+
+                    -- Priority 2: server paling sikit player
+                    if server.playing < bestCount then
+                        bestCount  = server.playing
+                        bestServer = server
+                    end
                 end
             end
-            if soloServer then kAutoStatus.Text = "✅ Solo server found!"; break end
+
+            -- Kalau dah jumpa solo server, tak payah scan lagi
+            if soloServer then
+                kAutoStatus.Text = "✅ Solo server found!"
+                break
+            end
+
             if data.nextPageCursor and data.nextPageCursor ~= "" then
-                cursor = data.nextPageCursor; task.wait(0.2)
-            else break end
+                cursor = data.nextPageCursor
+                task.wait(0.2) -- small delay elak rate limit
+            else
+                break
+            end
         end
 
+        -- Pilih server ikut priority
         local target = soloServer or bestServer
+
+        -- Fallback: kalau bestServer pun takde, random dari pool
         if not target and #allServers > 0 then
             target = allServers[math.random(1, #allServers)]
             kAutoStatus.Text = "🎲 Random fallback server"
         end
+
         if target then
-            kAutoStatus.Text = string.format("🚀 Hopping -> %d player(s) [scanned %d]", target.playing, totalScanned)
+            kAutoStatus.Text = string.format(
+                "🚀 Hopping -> %d player(s) [scanned %d]",
+                target.playing, totalScanned
+            )
             task.wait(1)
-            pcall(function() TeleportService:TeleportToPlaceInstance(placeId, target.id, player) end)
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, target.id, player)
+            end)
         else
             kAutoStatus.Text = string.format("❌ No server found (%d scanned)", totalScanned)
             kAutoStatus.TextColor3 = RED
-            task.wait(3); kothHopping = false
+            task.wait(3)
+            kothHopping = false
         end
     end)
 end
 
 -- ============================================================
--- AUTO KOTH LOOP
+-- AUTO KOTH LOOP - dynamic KOTH position scan
 -- ============================================================
 task.spawn(function()
     local wasHolding = false
+
     local function getKOTHPos()
+        -- Scan live coordinate dari AreaHitbox setiap kali
         local ok2, hitbox = pcall(function()
             return workspace:WaitForChild("KOTH", 5):WaitForChild("AreaHitbox", 5)
         end)
-        if ok2 and hitbox then return hitbox.Position + Vector3.new(0, 3, 0) end
+        if ok2 and hitbox then
+            return hitbox.Position + Vector3.new(0, 3, 0)  -- sikit offset elak void tepi hitbox
+        end
         return nil
     end
+
     while ScreenGui.Parent do
         if forceHop then
-            forceHop = false; hopToLeastPopulated("Force"); task.wait(5)
+            forceHop = false
+            hopToLeastPopulated("Force")
+            task.wait(5)
         end
+
         if autoKOTH and not kothHopping then
             local myAura = getAura()
             local claimed, kingName, kingAura = getKOTHStatus()
             local inKOTH = isInKOTH()
+
             if inKOTH then
                 if claimed and kingAura > myAura then
                     wasHolding = false
                     if autoServerHop then
-                        kAutoStatus.Text = "⚠️ Threat! Hopping..."; kAutoStatus.TextColor3 = RED
+                        kAutoStatus.Text = "⚠️ Threat! Hopping..."
+                        kAutoStatus.TextColor3 = RED
                         hopToLeastPopulated("Threat")
                     else
-                        kAutoStatus.Text = "⚠️ Threat! Staying..."; kAutoStatus.TextColor3 = WARN
+                        kAutoStatus.Text = "⚠️ Threat! Staying..."
+                        kAutoStatus.TextColor3 = WARN
                     end
                 else
                     wasHolding = true
-                    kAutoStatus.Text = "👑 Holding KOTH!"; kAutoStatus.TextColor3 = WHITE
+                    kAutoStatus.Text = "👑 Holding KOTH!"
+                    kAutoStatus.TextColor3 = WHITE
                 end
             else
-                local KOTH_POS = getKOTHPos()
+                local KOTH_POS = getKOTHPos()  -- scan setiap kali nak masuk
+
                 if wasHolding then
                     if claimed and kingAura > myAura then
                         wasHolding = false
                         if autoServerHop then
-                            kAutoStatus.Text = "💀 Killed! Hopping..."; kAutoStatus.TextColor3 = RED
-                            hopToLeastPopulated("Killed"); task.wait(5)
+                            kAutoStatus.Text = "💀 Killed! Hopping..."
+                            kAutoStatus.TextColor3 = RED
+                            hopToLeastPopulated("Killed")
+                            task.wait(5)
                         else
-                            kAutoStatus.Text = "💀 Killed! Checking..."; kAutoStatus.TextColor3 = WARN
+                            kAutoStatus.Text = "💀 Killed! Checking..."
+                            kAutoStatus.TextColor3 = WARN
                             task.wait(2)
                             local claimed2, _, kingAura2 = getKOTHStatus()
                             local myAura2 = getAura()
                             if not claimed2 or myAura2 > kingAura2 then
-                                kAutoStatus.Text = "🔁 Re-entering..."; kAutoStatus.TextColor3 = WARN
+                                kAutoStatus.Text = "🔁 Re-entering..."
+                                kAutoStatus.TextColor3 = WARN
                                 if KOTH_POS then teleport(KOTH_POS) end
                             else
-                                kAutoStatus.Text = "💪 King strong — waiting"; kAutoStatus.TextColor3 = RED
+                                kAutoStatus.Text = "💪 King strong — waiting"
+                                kAutoStatus.TextColor3 = RED
                             end
                         end
                     else
                         wasHolding = false
-                        kAutoStatus.Text = "🔁 Re-entering..."; kAutoStatus.TextColor3 = WARN
+                        kAutoStatus.Text = "🔁 Re-entering..."
+                        kAutoStatus.TextColor3 = WARN
                         if KOTH_POS then teleport(KOTH_POS) end
                     end
                 elseif not claimed then
-                    kAutoStatus.Text = "🟢 Empty — entering!"; kAutoStatus.TextColor3 = GREEN
+                    kAutoStatus.Text = "🟢 Empty — entering!"
+                    kAutoStatus.TextColor3 = GREEN
                     if KOTH_POS then teleport(KOTH_POS) end
                 elseif myAura > kingAura then
-                    kAutoStatus.Text = "⚡ King weak — entering!"; kAutoStatus.TextColor3 = WARN
+                    kAutoStatus.Text = "⚡ King weak — entering!"
+                    kAutoStatus.TextColor3 = WARN
                     if KOTH_POS then teleport(KOTH_POS) end
                 else
                     if autoServerHop then
-                        kAutoStatus.Text = "💪 King strong — hopping!"; kAutoStatus.TextColor3 = RED
+                        kAutoStatus.Text = "💪 King strong — hopping!"
+                        kAutoStatus.TextColor3 = RED
                         hopToLeastPopulated("Strong King")
                     else
-                        kAutoStatus.Text = "💪 King strong — waiting"; kAutoStatus.TextColor3 = RED
+                        kAutoStatus.Text = "💪 King strong — waiting"
+                        kAutoStatus.TextColor3 = RED
                     end
                 end
             end
@@ -1652,7 +1643,6 @@ task.spawn(function()
         task.wait(3)
     end
 end)
-
 -- ============================================================
 -- TOGGLE EVENTS
 -- ============================================================
@@ -1689,6 +1679,8 @@ end)
 kHopBtn.MouseButton1Click:Connect(function()
     forceHop = true
 end)
+
+local kothRebirthCount = 0
 kRebHitbox.MouseButton1Click:Connect(function()
     autoKothRebirth = not autoKothRebirth
     setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
@@ -1696,28 +1688,12 @@ kRebHitbox.MouseButton1Click:Connect(function()
     kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
     updateKRebTarget()
 end)
-kRebMultHitbox.MouseButton1Click:Connect(function()
-    kothRebMultOn = not kothRebMultOn
-    setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
-    autoSave()
-end)
-kRebMultMinus.MouseButton1Click:Connect(function()
-    kothRebMult = math.max(0.1, math.floor((kothRebMult - 0.1) * 10 + 0.5) / 10)
-    kRebMultBox.Text = formatThresh(kothRebMult); autoSave()
-end)
-kRebMultPlus.MouseButton1Click:Connect(function()
-    kothRebMult = math.floor((kothRebMult + 0.1) * 10 + 0.5) / 10
-    kRebMultBox.Text = formatThresh(kothRebMult); autoSave()
-end)
-kRebMultBox.FocusLost:Connect(function()
-    local n = tonumber(kRebMultBox.Text)
-    if n and n > 0 then kothRebMult = math.max(0.1, n) end
-    kRebMultBox.Text = formatThresh(kothRebMult); autoSave()
-end)
+
 MultHitbox.MouseButton1Click:Connect(function()
     multiplierOn = not multiplierOn
     setToggle(MultPill, MultDot, MultStroke, multiplierOn); autoSave()
 end)
+
 SetBtn.MouseButton1Click:Connect(function()
     if not selectedInPopup then closePopup(); return end
     comboTarget = areas[selectedInPopup]
@@ -1752,7 +1728,7 @@ MultMinus.MouseButton1Click:Connect(function()
     MultBox.Text = formatThresh(multiplier)
 end)
 MultPlus.MouseButton1Click:Connect(function()
-    multiplier = math.floor((multiplier+0.1)*10+0.5) / 10
+    multiplier = math.floor((multiplier+0.1)*10+0.5)/10
     MultBox.Text = formatThresh(multiplier)
 end)
 MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
@@ -1907,9 +1883,6 @@ task.spawn(function()
     end
 end)
 
--- ============================================================
--- KOTH REBIRTH LOOP
--- ============================================================
 task.spawn(function()
     while true do
         if autoKothRebirth then
@@ -1920,13 +1893,6 @@ task.spawn(function()
                 end
                 kothRebirthCount = kothRebirthCount + 1
                 kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
-                if kothRebMultOn then
-                    kothRebirthVal = kothRebirthVal * kothRebMult
-                    normalizeKRebTarget()
-                else
-                    updateKRebTarget()
-                end
-                autoSave()
                 task.wait(1)
             end
         end
@@ -1985,5 +1951,4 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("Auto Hub v3 loaded! KOTH Rebirth Multiplier + Dynamic KOTH Pos")
-print("[AutoHub] Script fully loaded!")
+print("Auto Hub v3 loaded! 2-Column Layout + Auto Server Hop")
