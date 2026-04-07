@@ -1,4 +1,4 @@
--- Auto Hub v3 - 2 Column Layout + Auto Server Hop
+-- Auto Hub v3 - 2 Column Layout + Auto Server Hop + KOTH Rebirth Multiplier
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -46,13 +46,18 @@ local threshold          = 2
 local multiplier         = 2
 local comboTarget        = nil
 local autoKOTH           = false
-local autoServerHop      = true   -- NEW: default ON
+local autoServerHop      = true
 local forceHop           = false
 local kothHopping        = false
 local autoKothRebirth    = false
 local kothRebirthTarget  = 500e39
 local kothRebirthUnit    = "Dd"
 local kothRebirthVal     = 500
+-- KOTH rebirth multiplier
+local kothRebMult        = 2
+local kothRebMultOn      = false
+-- FIX: declare here so loops can access it
+local kothRebirthCount   = 0
 
 local suffixes = {
     {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
@@ -109,12 +114,10 @@ local RED     = Color3.fromRGB(220, 80, 80)
 local DARK    = Color3.fromRGB(10, 10, 14)
 local PANEL   = Color3.fromRGB(18, 16, 26)
 
--- Window width: 320px, content = 320 - 36(tab) - 1(div) = 283px
--- Left col: 130px, vert divider: 1px, right col: 152px
 local CONTENT_W = 283
 local LEFT_W    = 130
 local RIGHT_W   = 152
-local VDIV_X    = TAB_W + 1 + LEFT_W  -- absolute X of vertical divider in Main
+local VDIV_X    = TAB_W + 1 + LEFT_W
 
 -- --- ScreenGui ---
 local ScreenGui = Instance.new("ScreenGui")
@@ -125,7 +128,7 @@ ScreenGui.DisplayOrder = 999
 local ok = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 if not ok then ScreenGui.Parent = player.PlayerGui end
 
--- --- Main Frame (width 320, height set later) ---
+-- --- Main Frame ---
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 320, 0, 300)
 Main.Position = UDim2.new(0, 16, 0.5, -150)
@@ -269,7 +272,6 @@ ContentArea.BorderSizePixel = 0
 ContentArea.ClipsDescendants = true
 ContentArea.Parent = Main
 
--- --- Helper: make a plain panel (no scroll) ---
 local function makePanel()
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, 0, 1, 0)
@@ -283,7 +285,6 @@ local PanelFarm   = makePanel(); PanelFarm.Visible   = false
 local PanelConfig = makePanel(); PanelConfig.Visible = false
 local PanelKOTH   = makePanel()
 
--- --- Vertical divider helper for panels ---
 local function makeVDiv(panel)
     local d = Instance.new("Frame")
     d.Size = UDim2.new(0, 1, 1, 0)
@@ -293,7 +294,6 @@ local function makeVDiv(panel)
     d.Parent = panel
 end
 
--- --- Left/Right column frames ---
 local function makeColumns(panel)
     local L = Instance.new("Frame")
     L.Size = UDim2.new(0, LEFT_W, 1, 0)
@@ -335,14 +335,11 @@ end
 
 -- ============================================================
 -- FARM PANEL - 2 Column
--- Left:  INDIVIDUAL toggles + UTILITY
--- Right: COMBO section + stats
 -- ============================================================
 do
     local L, R = makeColumns(PanelFarm)
     local PAD = 5
 
-    -- helpers scoped to Farm
     local function makeSec(parent, text, y)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(1, -PAD*2, 0, SEC_H)
@@ -403,9 +400,7 @@ do
         return y + 1 + GAP
     end
 
-    -- ---- LEFT COLUMN ----
     local yL = GAP
-    -- Area status
     local StatusLabel
     StatusLabel, yL = makeStatLbl(L, "Area: —", WHITE, yL)
     yL = makeHDiv(L, yL, LEFT_W)
@@ -421,15 +416,12 @@ do
     local ZoneBtn, ZonePill, ZoneDot, ZoneStroke
     ZoneBtn, ZonePill, ZoneDot, ZoneStroke, yL = makeToggle(L, "Zone Guard", yL)
 
-    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeSec(R, "COMBO", yR)
 
-    -- Train+Rebirth toggle
     local ComboBtn, ComboPill, ComboDot, ComboStroke
     ComboBtn, ComboPill, ComboDot, ComboStroke, yR = makeToggle(R, "Train+Rebirth", yR)
 
-    -- Target row
     local iw = RIGHT_W - PAD*2
     local TgFrame = Instance.new("Frame")
     TgFrame.Size = UDim2.new(0, iw, 0, ROW_H)
@@ -458,7 +450,6 @@ do
     TargetBtn.Text = ""; TargetBtn.Parent = TgFrame
     yR = yR + ROW_H + GAP
 
-    -- Threshold row (−/input/+)
     local function makeStepRow(parent, labelText, defVal, y)
         local fw = RIGHT_W - PAD*2
         local F = Instance.new("Frame")
@@ -509,7 +500,6 @@ do
         Lbl.BackgroundTransparency = 1; Lbl.Text = labelText
         Lbl.TextColor3 = WHITE; Lbl.TextSize = 9; Lbl.Font = Enum.Font.GothamBold
         Lbl.TextXAlignment = Enum.TextXAlignment.Left; Lbl.Parent = F
-        -- pill toggle
         local Pill = Instance.new("Frame")
         Pill.Size = UDim2.new(0,22,0,12); Pill.Position = UDim2.new(0,fw*0.3,0.5,-6)
         Pill.BackgroundColor3 = Color3.fromRGB(40,35,55); Pill.BorderSizePixel = 0; Pill.Parent = F
@@ -521,7 +511,6 @@ do
         local PillHitbox = Instance.new("TextButton")
         PillHitbox.Size = UDim2.new(0,30,1,0); PillHitbox.Position = UDim2.new(0,fw*0.3-4,0,0)
         PillHitbox.BackgroundTransparency = 1; PillHitbox.Text = ""; PillHitbox.Parent = F
-        -- minus/box/plus
         local Minus = Instance.new("TextButton")
         Minus.Size = UDim2.new(0,14,0,12); Minus.Position = UDim2.new(1,-68,0.5,-6)
         Minus.BackgroundColor3 = Color3.fromRGB(40,35,60); Minus.BorderSizePixel = 0
@@ -560,7 +549,6 @@ do
 
     local farmH = math.max(yL, yR) + GAP
 
-    -- expose to outer scope
     _G._AH_Farm = {
         StatusLabel=StatusLabel, TrainBtn=TrainBtn, TrainPill=TrainPill, TrainDot=TrainDot, TrainStroke=TrainStroke,
         RebirthBtn=RebirthBtn, RebirthPill=RebirthPill, RebirthDot=RebirthDot, RebirthStroke=RebirthStroke,
@@ -595,22 +583,22 @@ _G._AH_Farm = nil
 
 -- ============================================================
 -- KOTH PANEL - 2 Column
--- Left:  STATUS + MY STATS
--- Right: AUTO KOTH controls + AUTO REBIRTH
 -- ============================================================
 local kStatusDot, kRowStatus, kRowKing, kRowKingAura, kRowMyAura, kRowResult, kRowMyRank
 local kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, kAutoStatus
-local kHopHitbox, kHopPill, kHopDot, kHopStroke   -- Auto Server Hop toggle
-local kHopBtn                                        -- Force Hop button
+local kHopHitbox, kHopPill, kHopDot, kHopStroke
+local kHopBtn
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
+-- KOTH rebirth multiplier UI vars
+local kRebMultHitbox, kRebMultPill, kRebMultDot, kRebMultStroke
+local kRebMultMinus, kRebMultBox, kRebMultPlus
 local kothH
 
 do
     local L, R = makeColumns(PanelKOTH)
     local PAD = 5
 
-    -- helpers
     local function makeSec(parent, text, y, w)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(0, (w or LEFT_W)-PAD*2, 0, SEC_H)
@@ -692,14 +680,12 @@ do
     -- ---- LEFT COLUMN ----
     local yL = GAP
 
-    -- status dot
     kStatusDot = Instance.new("Frame")
     kStatusDot.Size = UDim2.new(0,8,0,8); kStatusDot.Position = UDim2.new(0,PAD,0,yL+2)
     kStatusDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kStatusDot.BorderSizePixel = 0
     kStatusDot.Parent = L
     Instance.new("UICorner", kStatusDot).CornerRadius = UDim.new(1,0)
 
-    -- section label offset for dot
     local secLbl = Instance.new("TextLabel")
     secLbl.Size = UDim2.new(0, LEFT_W-PAD*2-10, 0, SEC_H)
     secLbl.Position = UDim2.new(0, PAD+12, 0, yL)
@@ -724,12 +710,9 @@ do
 
     kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, yR = makeToggleR(R, "Auto Enter KOTH", yR)
 
-    -- Auto Server Hop toggle (NEW)
     kHopHitbox, kHopPill, kHopDot, kHopStroke, yR = makeToggleR(R, "Auto Server Hop", yR)
-    -- default ON
     setToggle(kHopPill, kHopDot, kHopStroke, true)
 
-    -- status label
     kAutoStatus = Instance.new("TextLabel")
     kAutoStatus.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, STAT_H)
     kAutoStatus.Position = UDim2.new(0, PAD, 0, yR)
@@ -738,7 +721,6 @@ do
     kAutoStatus.TextXAlignment = Enum.TextXAlignment.Left; kAutoStatus.Parent = R
     yR = yR + STAT_H + GAP
 
-    -- Force Hop button
     kHopBtn = Instance.new("TextButton")
     kHopBtn.Size = UDim2.new(0, RIGHT_W-PAD*2, 0, 18)
     kHopBtn.Position = UDim2.new(0, PAD, 0, yR)
@@ -749,13 +731,11 @@ do
     Instance.new("UICorner", kHopBtn).CornerRadius = UDim.new(0,6)
     yR = yR + 18 + GAP
 
-    -- Auto Rebirth section
     local yRd = makeHDiv(R, yR, RIGHT_W)
     yR = makeSec(R, "AUTO REBIRTH", yRd, RIGHT_W)
 
     kRebHitbox, kRebPill, kRebDot, kRebStroke, yR = makeToggleR(R, "Auto Rebirth", yR)
 
-    -- Input row
     local iw = RIGHT_W - PAD*2
     local kRebInputRow = Instance.new("Frame")
     kRebInputRow.Size = UDim2.new(0, iw, 0, 20)
@@ -801,13 +781,67 @@ do
     kRebCount.TextXAlignment = Enum.TextXAlignment.Left; kRebCount.Parent = R
     yR = yR + STAT_H + GAP
 
+    -- ============================================================
+    -- KOTH REBIRTH MULTIPLIER ROW
+    -- ============================================================
+    local kRebMultRow = Instance.new("Frame")
+    kRebMultRow.Size = UDim2.new(0, iw, 0, ROW_H)
+    kRebMultRow.Position = UDim2.new(0, PAD, 0, yR)
+    kRebMultRow.BackgroundColor3 = PANEL; kRebMultRow.BorderSizePixel = 0; kRebMultRow.Parent = R
+    Instance.new("UICorner", kRebMultRow).CornerRadius = UDim.new(0,6)
+    kRebMultStroke = Instance.new("UIStroke", kRebMultRow)
+    kRebMultStroke.Color = Color3.fromRGB(60,45,90); kRebMultStroke.Thickness = 1
+
+    local kRebMultLbl = Instance.new("TextLabel")
+    kRebMultLbl.Size = UDim2.new(0,30,1,0); kRebMultLbl.Position = UDim2.new(0,4,0,0)
+    kRebMultLbl.BackgroundTransparency = 1; kRebMultLbl.Text = "Mult:"
+    kRebMultLbl.TextColor3 = WHITE; kRebMultLbl.TextSize = 9; kRebMultLbl.Font = Enum.Font.GothamBold
+    kRebMultLbl.TextXAlignment = Enum.TextXAlignment.Left; kRebMultLbl.Parent = kRebMultRow
+
+    kRebMultPill = Instance.new("Frame")
+    kRebMultPill.Size = UDim2.new(0,22,0,12); kRebMultPill.Position = UDim2.new(0,34,0.5,-6)
+    kRebMultPill.BackgroundColor3 = Color3.fromRGB(40,35,55); kRebMultPill.BorderSizePixel = 0
+    kRebMultPill.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultPill).CornerRadius = UDim.new(1,0)
+
+    kRebMultDot = Instance.new("Frame")
+    kRebMultDot.Size = UDim2.new(0,8,0,8); kRebMultDot.Position = UDim2.new(0,2,0.5,-4)
+    kRebMultDot.BackgroundColor3 = Color3.fromRGB(100,90,130); kRebMultDot.BorderSizePixel = 0
+    kRebMultDot.Parent = kRebMultPill
+    Instance.new("UICorner", kRebMultDot).CornerRadius = UDim.new(1,0)
+
+    kRebMultHitbox = Instance.new("TextButton")
+    kRebMultHitbox.Size = UDim2.new(0,30,1,0); kRebMultHitbox.Position = UDim2.new(0,30,0,0)
+    kRebMultHitbox.BackgroundTransparency = 1; kRebMultHitbox.Text = ""; kRebMultHitbox.Parent = kRebMultRow
+
+    kRebMultMinus = Instance.new("TextButton")
+    kRebMultMinus.Size = UDim2.new(0,14,0,12); kRebMultMinus.Position = UDim2.new(1,-68,0.5,-6)
+    kRebMultMinus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultMinus.BorderSizePixel = 0
+    kRebMultMinus.Text = "−"; kRebMultMinus.TextColor3 = WHITE; kRebMultMinus.TextSize = 11
+    kRebMultMinus.Font = Enum.Font.GothamBold; kRebMultMinus.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultMinus).CornerRadius = UDim.new(1,0)
+
+    kRebMultBox = Instance.new("TextBox")
+    kRebMultBox.Size = UDim2.new(0,34,0,12); kRebMultBox.Position = UDim2.new(1,-52,0.5,-6)
+    kRebMultBox.BackgroundColor3 = Color3.fromRGB(30,26,44); kRebMultBox.BorderSizePixel = 0
+    kRebMultBox.Text = formatThresh(kothRebMult); kRebMultBox.TextColor3 = WHITE
+    kRebMultBox.TextSize = 9; kRebMultBox.Font = Enum.Font.GothamBold
+    kRebMultBox.ClearTextOnFocus = true; kRebMultBox.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultBox).CornerRadius = UDim.new(0,4)
+
+    kRebMultPlus = Instance.new("TextButton")
+    kRebMultPlus.Size = UDim2.new(0,14,0,12); kRebMultPlus.Position = UDim2.new(1,-16,0.5,-6)
+    kRebMultPlus.BackgroundColor3 = Color3.fromRGB(40,35,60); kRebMultPlus.BorderSizePixel = 0
+    kRebMultPlus.Text = "+"; kRebMultPlus.TextColor3 = WHITE; kRebMultPlus.TextSize = 11
+    kRebMultPlus.Font = Enum.Font.GothamBold; kRebMultPlus.Parent = kRebMultRow
+    Instance.new("UICorner", kRebMultPlus).CornerRadius = UDim.new(1,0)
+
+    yR = yR + ROW_H + GAP
     kothH = math.max(yL, yR) + GAP
 end
 
 -- ============================================================
 -- CONFIG PANEL - 2 Column
--- Left:  Name input + Save button + status
--- Right: Saved configs list + Load/Delete/AutoLoad
 -- ============================================================
 local configNameBox, btnSave, configList, configListLayout
 local btnLoad, btnDelete, btnAutoLoad, configStatus
@@ -829,7 +863,6 @@ do
         return y + 12 + GAP
     end
 
-    -- ---- LEFT COLUMN ----
     local yL = GAP
     yL = makeLbl(L, "💾 CONFIG", yL, WHITE, 10)
 
@@ -871,7 +904,6 @@ do
     configStatus.Parent = L
     yL = yL + 12 + GAP
 
-    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeLbl(R, "Saved configs:", yR, DIM, 8, RIGHT_W)
 
@@ -920,14 +952,14 @@ do
 end
 
 -- ============================================================
--- RESIZE MAIN to tallest panel
+-- RESIZE MAIN
 -- ============================================================
 local fullH = PAD_TOP + math.max(farmH, kothH, configH) + GAP
 Main.Size = UDim2.new(0, 320, 0, fullH)
 Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
 
 -- ============================================================
--- KOTH LOGIC (unchanged)
+-- KOTH LOGIC
 -- ============================================================
 local kothHitbox = nil
 pcall(function()
@@ -1034,7 +1066,7 @@ TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
 switchTab("koth")
 
 -- ============================================================
--- POPUP (Rebirth Target selector) - unchanged logic
+-- POPUP (Rebirth Target selector)
 -- ============================================================
 local POPUP_W    = 200
 local POPUP_ITEM_H = 20
@@ -1166,6 +1198,45 @@ local function updateKRebTarget()
             break
         end
     end
+end
+
+-- ============================================================
+-- NORMALIZE KOTH REBIRTH TARGET (auto convert unit)
+-- ============================================================
+local function normalizeKRebTarget()
+    local currentUnitVal = 1e39
+    for i, u in ipairs(kRebUnitUnits) do
+        if u == kothRebirthUnit then
+            currentUnitVal = kRebUnitValues[i]
+            break
+        end
+    end
+
+    local rawTotal = kothRebirthVal * currentUnitVal
+
+    local bestIdx = 1
+    for i = #kRebUnitUnits, 1, -1 do
+        if rawTotal >= kRebUnitValues[i] then
+            bestIdx = i
+            break
+        end
+    end
+
+    if bestIdx > #kRebUnitUnits then bestIdx = #kRebUnitUnits end
+
+    kothRebirthUnit   = kRebUnitUnits[bestIdx]
+    kothRebirthVal    = rawTotal / kRebUnitValues[bestIdx]
+    kothRebirthVal    = math.floor(kothRebirthVal * 100 + 0.5) / 100
+    kothRebirthTarget = rawTotal
+
+    if rawTotal > kRebUnitValues[#kRebUnitUnits] then
+        kothRebirthVal = math.floor((rawTotal / kRebUnitValues[#kRebUnitUnits]) * 100 + 0.5) / 100
+        kothRebirthUnit = kRebUnitUnits[#kRebUnitUnits]
+        kothRebirthTarget = rawTotal
+    end
+
+    kRebInput.Text   = tostring(kothRebirthVal)
+    kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
 end
 
 local UPOP_W      = 160
@@ -1300,7 +1371,7 @@ local CONFIG_FILE  = "autohub_config.json"
 local AUTOLOAD_KEY = "__autoload__"
 local hasFS        = false
 local selectedCfg  = nil
-local isLoading    = false  -- guard: prevent autoSave from overwriting during load
+local isLoading    = false
 
 pcall(function()
     hasFS = type(writefile) == "function" and type(readfile) == "function"
@@ -1342,6 +1413,8 @@ local function getCurrentSettings()
         autoKothRebirth = autoKothRebirth,
         kothRebirthVal  = kothRebirthVal,
         kothRebirthUnit = kothRebirthUnit,
+        kothRebMult     = kothRebMult,
+        kothRebMultOn   = kothRebMultOn,
     }
 end
 
@@ -1380,6 +1453,14 @@ local function applySettings(s)
         kothRebirthUnit = s.kothRebirthUnit
         kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
     end
+    if s.kothRebMult ~= nil then
+        kothRebMult = s.kothRebMult
+        kRebMultBox.Text = formatThresh(kothRebMult)
+    end
+    if s.kothRebMultOn ~= nil then
+        kothRebMultOn = s.kothRebMultOn
+        setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
+    end
     updateKRebTarget()
     ThreshBox.Text = formatThresh(threshold); MultBox.Text = formatThresh(multiplier)
     updateStatus()
@@ -1388,7 +1469,7 @@ end
 local function autoSave()
     task.spawn(function()
         task.wait(0.5)
-        if isLoading then return end  -- skip if load just happened (prevent race condition)
+        if isLoading then return end
         local configs = loadConfigFile()
         if selectedCfg and configs[selectedCfg] then
             configs[selectedCfg] = getCurrentSettings()
@@ -1446,12 +1527,11 @@ local function hopToLeastPopulated(reason)
         local currentJobId = game.JobId
         local bestServer   = nil
         local bestCount    = math.huge
-        local soloServer   = nil   -- priority: server dengan exactly 1 player
-        local allServers   = {}    -- fallback pool
+        local soloServer   = nil
+        local allServers   = {}
         local cursor       = ""
         local totalScanned = 0
 
-        -- Scan up to 5 pages (max 500 servers)
         for page = 1, 5 do
             kAutoStatus.Text = string.format("🔍 Scanning page %d/5...", page)
 
@@ -1478,7 +1558,6 @@ local function hopToLeastPopulated(reason)
             if not ok3 or not data or not data.data then break end
 
             for _, server in ipairs(data.data) do
-                -- Skip server semasa dan server kosong (ghost server)
                 if server.id ~= currentJobId
                     and server.playing ~= nil
                     and server.playing >= 1
@@ -1486,12 +1565,10 @@ local function hopToLeastPopulated(reason)
                     totalScanned = totalScanned + 1
                     table.insert(allServers, server)
 
-                    -- Priority 1: server solo (1 player je)
                     if server.playing == 1 and soloServer == nil then
                         soloServer = server
                     end
 
-                    -- Priority 2: server paling sikit player
                     if server.playing < bestCount then
                         bestCount  = server.playing
                         bestServer = server
@@ -1499,7 +1576,6 @@ local function hopToLeastPopulated(reason)
                 end
             end
 
-            -- Kalau dah jumpa solo server, tak payah scan lagi
             if soloServer then
                 kAutoStatus.Text = "✅ Solo server found!"
                 break
@@ -1507,16 +1583,14 @@ local function hopToLeastPopulated(reason)
 
             if data.nextPageCursor and data.nextPageCursor ~= "" then
                 cursor = data.nextPageCursor
-                task.wait(0.2) -- small delay elak rate limit
+                task.wait(0.2)
             else
                 break
             end
         end
 
-        -- Pilih server ikut priority
         local target = soloServer or bestServer
 
-        -- Fallback: kalau bestServer pun takde, random dari pool
         if not target and #allServers > 0 then
             target = allServers[math.random(1, #allServers)]
             kAutoStatus.Text = "🎲 Random fallback server"
@@ -1547,12 +1621,11 @@ task.spawn(function()
     local wasHolding = false
 
     local function getKOTHPos()
-        -- Scan live coordinate dari AreaHitbox setiap kali
         local ok2, hitbox = pcall(function()
             return workspace:WaitForChild("KOTH", 5):WaitForChild("AreaHitbox", 5)
         end)
         if ok2 and hitbox then
-            return hitbox.Position + Vector3.new(0, 3, 0)  -- sikit offset elak void tepi hitbox
+            return hitbox.Position + Vector3.new(0, 3, 0)
         end
         return nil
     end
@@ -1586,7 +1659,7 @@ task.spawn(function()
                     kAutoStatus.TextColor3 = WHITE
                 end
             else
-                local KOTH_POS = getKOTHPos()  -- scan setiap kali nak masuk
+                local KOTH_POS = getKOTHPos()
 
                 if wasHolding then
                     if claimed and kingAura > myAura then
@@ -1640,6 +1713,7 @@ task.spawn(function()
         task.wait(3)
     end
 end)
+
 -- ============================================================
 -- TOGGLE EVENTS
 -- ============================================================
@@ -1677,13 +1751,40 @@ kHopBtn.MouseButton1Click:Connect(function()
     forceHop = true
 end)
 
-local kothRebirthCount = 0
 kRebHitbox.MouseButton1Click:Connect(function()
     autoKothRebirth = not autoKothRebirth
     setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
     kRebStatus.Text = autoKothRebirth and "ON" or "OFF"
     kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
     updateKRebTarget()
+end)
+
+-- KOTH rebirth multiplier toggle events
+kRebMultHitbox.MouseButton1Click:Connect(function()
+    kothRebMultOn = not kothRebMultOn
+    setToggle(kRebMultPill, kRebMultDot, kRebMultStroke, kothRebMultOn)
+    autoSave()
+end)
+
+kRebMultMinus.MouseButton1Click:Connect(function()
+    kothRebMult = math.max(0.1, math.floor((kothRebMult - 0.1) * 10 + 0.5) / 10)
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
+end)
+
+kRebMultPlus.MouseButton1Click:Connect(function()
+    kothRebMult = math.floor((kothRebMult + 0.1) * 10 + 0.5) / 10
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
+end)
+
+kRebMultBox.FocusLost:Connect(function()
+    local n = tonumber(kRebMultBox.Text)
+    if n and n > 0 then
+        kothRebMult = math.max(0.1, n)
+    end
+    kRebMultBox.Text = formatThresh(kothRebMult)
+    autoSave()
 end)
 
 MultHitbox.MouseButton1Click:Connect(function()
@@ -1725,7 +1826,7 @@ MultMinus.MouseButton1Click:Connect(function()
     MultBox.Text = formatThresh(multiplier)
 end)
 MultPlus.MouseButton1Click:Connect(function()
-    multiplier = math.floor((multiplier+0.1)*10+0.5)/10
+    multiplier = math.floor((multiplier+0.1)*10+0.5) / 10
     MultBox.Text = formatThresh(multiplier)
 end)
 MultBox.FocusLost:Connect(function() applyMultiplier(MultBox.Text) end)
@@ -1880,6 +1981,9 @@ task.spawn(function()
     end
 end)
 
+-- ============================================================
+-- KOTH REBIRTH LOOP - with multiplier + normalize
+-- ============================================================
 task.spawn(function()
     while true do
         if autoKothRebirth then
@@ -1890,6 +1994,15 @@ task.spawn(function()
                 end
                 kothRebirthCount = kothRebirthCount + 1
                 kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
+
+                if kothRebMultOn then
+                    kothRebirthVal = kothRebirthVal * kothRebMult
+                    normalizeKRebTarget()
+                else
+                    updateKRebTarget()
+                end
+
+                autoSave()
                 task.wait(1)
             end
         end
@@ -1948,4 +2061,4 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-print("Auto Hub v3 loaded! 2-Column Layout + Auto Server Hop")
+print("Auto Hub v3 loaded! KOTH Rebirth Multiplier + Dynamic KOTH Pos")
