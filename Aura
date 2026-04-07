@@ -805,6 +805,7 @@ do
     yR = yR + STAT_H + GAP
     
     local KMFW = RIGHT_W - PAD*2
+    local KMF = Instance.new("Frame")
     
     kothH = math.max(yL, yR) + GAP
 end
