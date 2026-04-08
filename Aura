@@ -187,7 +187,8 @@ if not ok then ScreenGui.Parent = player.PlayerGui end
 -- ============================================================
 local Main = Instance.new("Frame")
 Main.Size                  = UDim2.new(0, 320, 0, 300)
-Main.Position              = UDim2.new(0.5, -160, 0.5, -150)
+Main.Position              = UDim2.new(0.5, 0, 0.5, 0)
+Main.AnchorPoint           = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3      = DARK
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel       = 0
@@ -915,7 +916,7 @@ end
 -- ============================================================
 local fullH = PAD_TOP + math.max(kothH, configH) + GAP
 Main.Size     = UDim2.new(0, 320, 0, fullH)
-Main.Position = UDim2.new(0, 16, 0.5, -fullH/2)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
 
 -- ============================================================
 -- KOTH LOGIC
@@ -1871,4 +1872,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test1 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
