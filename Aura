@@ -401,6 +401,7 @@ local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
 local kRebMultInput, kRebMultDec, kRebMultInc, kInstantRebBtn
 local kNotifRebHitbox, kNotifRebPill, kNotifRebDot, kNotifRebStroke
+local kNotifRebCount
 local kothH
 
 do
@@ -568,10 +569,6 @@ do
     kInstantRebStroke.Color     = Color3.fromRGB(180, 80, 220)
     kInstantRebStroke.Thickness = 1
     yL = yL + 20 + GAP
-
-    yL = makeHDiv(L, yL, LEFT_W)
-    yL = makeSec(L, "AUTO NOTIF REBIRTH", yL)
-    kNotifRebHitbox, kNotifRebPill, kNotifRebDot, kNotifRebStroke, yL = makeToggleR(L, "Rebirth on Notif", yL, LEFT_W)
 
     -- ---- RIGHT COLUMN ----
     local yR = GAP
@@ -744,6 +741,22 @@ do
     kRebCount.Font               = Enum.Font.Gotham
     kRebCount.TextXAlignment     = Enum.TextXAlignment.Left
     kRebCount.Parent             = R
+    yR = yR + STAT_H + GAP
+
+    local yRd2 = makeHDiv(R, yR, RIGHT_W)
+    yR = makeSec(R, "AUTO NOTIF REBIRTH", yRd2, RIGHT_W)
+    kNotifRebHitbox, kNotifRebPill, kNotifRebDot, kNotifRebStroke, yR = makeToggleR(R, "Rebirth on Notif", yR)
+
+    kNotifRebCount = Instance.new("TextLabel")
+    kNotifRebCount.Size               = UDim2.new(0, RIGHT_W-PAD*2, 0, STAT_H)
+    kNotifRebCount.Position           = UDim2.new(0, PAD, 0, yR)
+    kNotifRebCount.BackgroundTransparency = 1
+    kNotifRebCount.Text               = "Notif Rebirths: 0"
+    kNotifRebCount.TextColor3         = DIM
+    kNotifRebCount.TextSize           = 9
+    kNotifRebCount.Font               = Enum.Font.Gotham
+    kNotifRebCount.TextXAlignment     = Enum.TextXAlignment.Left
+    kNotifRebCount.Parent             = R
     yR = yR + STAT_H + GAP
 
     kothH = math.max(yL, yR) + GAP
@@ -1764,6 +1777,8 @@ task.spawn(function()
             if currentY > 0.0 and not notifDebounce then
                 notifDebounce = true
                 pcall(function() RequestRebirth:InvokeServer() end)
+                local notifRebCount = (tonumber(kNotifRebCount.Text:match("%d+")) or 0) + 1
+                kNotifRebCount.Text = "Notif Rebirths: " .. notifRebCount
                 repeat task.wait(0.1) until topBar.Position.Y.Scale <= 0.0 or killed
                 notifDebounce = false
             end
