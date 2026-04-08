@@ -143,6 +143,7 @@ local autoServerHop         = true
 local forceHop              = false
 local kothHopping           = false
 local autoKothRebirth       = false
+local autoNotifRebirth      = false
 local kothRebirthGroup      = 16     -- group 16 = QDc = 1e48 (current game range)
 local kothRebirthUnit       = "QDc"  -- label untuk display
 local kothRebirthVal        = 1      -- mantissa value
@@ -399,6 +400,7 @@ local kHopBtn
 local kRebHitbox, kRebPill, kRebDot, kRebStroke
 local kRebInput, kRebUnitBtn, kRebStatus, kRebCount
 local kRebMultInput, kRebMultDec, kRebMultInc, kInstantRebBtn
+local kNotifRebHitbox, kNotifRebPill, kNotifRebDot, kNotifRebStroke
 local kothH
 
 do
@@ -566,6 +568,10 @@ do
     kInstantRebStroke.Color     = Color3.fromRGB(180, 80, 220)
     kInstantRebStroke.Thickness = 1
     yL = yL + 20 + GAP
+
+    yL = makeHDiv(L, yL, LEFT_W)
+    yL = makeSec(L, "AUTO NOTIF REBIRTH", yL)
+    kNotifRebHitbox, kNotifRebPill, kNotifRebDot, kNotifRebStroke, yL = makeToggleR(L, "Rebirth on Notif", yL, LEFT_W)
 
     -- ---- RIGHT COLUMN ----
     local yR = GAP
@@ -1311,6 +1317,7 @@ local function getCurrentSettings()
         autoKOTH              = autoKOTH,
         autoServerHop         = autoServerHop,
         autoKothRebirth       = autoKothRebirth,
+        autoNotifRebirth      = autoNotifRebirth,
         kothRebirthMultiplier = kothRebirthMultiplier,
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
@@ -1335,6 +1342,10 @@ local function applySettings(s)
         setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
         kRebStatus.Text      = autoKothRebirth and "ON" or "OFF"
         kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
+    end
+    if s.autoNotifRebirth ~= nil then
+        autoNotifRebirth = s.autoNotifRebirth
+        setToggle(kNotifRebPill, kNotifRebDot, kNotifRebStroke, autoNotifRebirth)
     end
     if s.kothRebirthMultiplier ~= nil then
         kothRebirthMultiplier = s.kothRebirthMultiplier
@@ -1619,6 +1630,11 @@ kInstantRebBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+kNotifRebHitbox.MouseButton1Click:Connect(function()
+    autoNotifRebirth = not autoNotifRebirth
+    setToggle(kNotifRebPill, kNotifRebDot, kNotifRebStroke, autoNotifRebirth)
+end)
+
 local kothRebirthCount = 0
 kRebHitbox.MouseButton1Click:Connect(function()
     autoKothRebirth = not autoKothRebirth
@@ -1699,7 +1715,7 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    autoKOTH = false; autoKothRebirth = false
+    autoKOTH = false; autoKothRebirth = false; autoNotifRebirth = false
     killEvent:Fire()
     ScreenGui:Destroy()
 end)
@@ -1711,6 +1727,34 @@ task.spawn(function()
     while ScreenGui.Parent do
         if activeTab == "koth" then updateKOTHPanel() end
         task.wait(2)
+    end
+end)
+
+task.spawn(function()
+    -- Auto Notif Rebirth loop
+    local RunService   = game:GetService("RunService")
+    local playerGui    = player:WaitForChild("PlayerGui")
+    local topBar       = nil
+    local notifDebounce = false
+
+    pcall(function()
+        topBar = playerGui:WaitForChild("Hud", 15):WaitForChild("TopBar", 15)
+    end)
+
+    local killed = false
+    killEvent.Event:Connect(function() killed = true end)
+
+    while not killed and ScreenGui.Parent do
+        if autoNotifRebirth and topBar and RequestRebirth then
+            local currentY = topBar.Position.Y.Scale
+            if currentY > 0.0 and not notifDebounce then
+                notifDebounce = true
+                pcall(function() RequestRebirth:InvokeServer() end)
+                repeat task.wait(0.1) until not topBar or topBar.Position.Y.Scale <= 0.0 or killed
+                notifDebounce = false
+            end
+        end
+        task.wait(0.05)
     end
 end)
 
@@ -1798,4 +1842,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test1 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("Aura Ascension v4 loaded -- New auto rebirth toggle)
