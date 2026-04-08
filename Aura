@@ -1482,4 +1482,4 @@ game:GetService("Players").PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Auto Hub v3 loaded! KOTH + Config Only")
+print("Aura Ascension loaded")
