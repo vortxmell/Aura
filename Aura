@@ -99,18 +99,32 @@ local function getAura()
 end
 
 -- Dapat aura sebagai (group, mantissa) untuk comparison rebirth target yang accurate
--- Guna Aura_Exponent attribute kalau ada (lebih accurate untuk nilai > 1e308)
+-- PENTING: Aura_Exponent dalam game adalah INTEGER (e.g. 48 untuk range QDc),
+-- jadi mantissa MESTI diambil dari raw Aura attribute, bukan dikira dari exponent.
 local function getAuraTier()
-    local exp = player:GetAttribute("Aura_Exponent")
-    if type(exp) == "number" and exp >= 0 then
-        local grp      = math.floor(exp / 3)
-        local mantissa = 10 ^ (exp - grp * 3)
-        return grp, mantissa
-    end
     local aura = player:GetAttribute("Aura") or 0
-    if aura <= 0 then return 0, 0 end
-    local grp      = math.floor(math.log10(aura) / 3)
-    local mantissa = aura / (10 ^ (grp * 3))
+    local exp  = player:GetAttribute("Aura_Exponent")
+
+    -- Tentukan group
+    local grp
+    if type(exp) == "number" and exp >= 0 then
+        grp = math.floor(exp / 3)
+    else
+        if aura <= 0 then return 0, 0 end
+        grp = math.floor(math.log10(aura) / 3)
+    end
+
+    -- Mantissa sentiasa dari raw Aura (Aura_Exponent adalah integer, tak boleh pakai untuk mantissa)
+    local mantissa
+    if aura > 0 then
+        mantissa = aura / (10 ^ (grp * 3))
+    elseif type(exp) == "number" then
+        -- Aura overflow (>1e308): fallback estimate dari exponent
+        mantissa = 10 ^ (exp - grp * 3)
+    else
+        mantissa = 0
+    end
+
     return grp, mantissa
 end
 
@@ -1784,4 +1798,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803). Fixing target rebirth")
+print("test1 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
