@@ -48,32 +48,67 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- NUMBER FORMATTING
+-- NUMBER FORMATTING — ported dari game source (SuffixBoardFrame)
+-- Support sampai 1e1803 (Sxc), sama exact dengan game
 -- ============================================================
-local suffixes = {
-    {1e63,"Uvg"},{1e60,"Nod"},{1e57,"Ocd"},{1e54,"Spd"},
-    {1e51,"Sxd"},{1e48,"Qid"},{1e45,"Qad"},{1e42,"Td"},
-    {1e39,"Dd"}, {1e36,"Ud"},{1e33,"Dc"},{1e30,"No"},
-    {1e27,"Oc"},{1e24,"Sp"},{1e21,"Sx"},{1e18,"Qi"},
-    {1e15,"Qa"},{1e12,"T"},{1e9,"B"},{1e6,"M"},{1e3,"👑"},
+local _s0 = {[0]="","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No"}
+local _s1 = {[0]="","U","D","T","q","Q","s","S","O","N"}
+local _s2 = {
+    "Dc","Vg","Tg","Qg","Qig","Sxg","Spg","Og","Ng",
+    "Ce","DcCe","VgCe","TgCe","QgCe","QigCe","SxgCe","SpgCe","OgCe","NgCe",
+    "Dc","DcDc","VgDc","TgDc","QgDc","QigDc","SxgDc","SpgDc","OgDc","NgDc",
+    "Tc","DcTc","VgTc","TgTc","QgTc","QigTc","SxgTc","SpgTc","OgTc","NgTc",
+    "Qg","DcQg","VgQg","TgQg","QgQg","QigQg","SxgQg","SpgQg","OgQg","NgQg",
+    "Qi","DcQi","VgQi","TgQi","QgQi","QigQi","SxgQi","SpgQi","OgQi","NgQi",
+    "Sxc"
 }
 
+-- Group g → suffix label (g=1→K, g=16→QDc, g=601→Sxc)
+local function getSuffix(g)
+    local s = _s0[g]
+    if s ~= nil then return s end
+    if g < 11 then return "e"..tostring(g*3) end
+    local tier = math.floor((g - 1) / 10)
+    local mod  = (g - 1) % 10
+    local base = _s2[tier]
+    if base == nil then return "e"..tostring(g*3) end
+    return (_s1[mod] or "") .. base
+end
+
+-- Format number untuk display (guna log10, works semua range)
 local function formatNum(n)
-    for _, s in ipairs(suffixes) do
-        if n >= s[1] then return string.format("%.1f%s", n/s[1], s[2]) end
-    end
-    return tostring(math.floor(n))
+    if not n or n <= 0 then return "0" end
+    if n < 1e3 then return tostring(math.floor(n)) end
+    local logVal = math.log10(n)
+    local g = math.min(math.floor(logVal / 3), 601)
+    local m = 10 ^ (logVal - g * 3)
+    return string.format("%.1f%s", m, getSuffix(g))
 end
 
 local function fmtA(n)
     if not n or n <= 0 then return "0" end
-    for _, s in ipairs(suffixes) do
-        if n >= s[1] then return string.format("%.2f%s", n/s[1], s[2]) end
-    end
-    return string.format("%.0f", n)
+    if n < 1e3 then return string.format("%.0f", n) end
+    local logVal = math.log10(n)
+    local g = math.min(math.floor(logVal / 3), 601)
+    local m = 10 ^ (logVal - g * 3)
+    return string.format("%.2f%s", m, getSuffix(g))
 end
 
-local function getAura() return player:GetAttribute("Aura") or 0 end
+local function getAura()
+    return player:GetAttribute("Aura") or 0
+end
+
+-- Dapat "aura group" (suffix tier) untuk comparison rebirth target
+-- Guna Aura_Exponent attribute kalau ada (lebih accurate untuk nilai > 1e308)
+local function getAuraGroup()
+    local exp = player:GetAttribute("Aura_Exponent")
+    if type(exp) == "number" and exp >= 0 then
+        return math.floor(exp / 3)
+    end
+    local aura = player:GetAttribute("Aura") or 0
+    if aura <= 0 then return 0 end
+    return math.floor(math.log10(aura) / 3)
+end
 
 local function teleport(pos)
     local c = player.Character
@@ -90,9 +125,9 @@ local autoServerHop         = true
 local forceHop              = false
 local kothHopping           = false
 local autoKothRebirth       = false
-local kothRebirthTarget     = 1e39   -- fallback minimum, akan overwrite oleh saved target
-local kothRebirthUnit       = "Dd"   -- fallback, akan overwrite oleh saved target
-local kothRebirthVal        = 1      -- fallback, akan overwrite oleh saved target
+local kothRebirthGroup      = 16     -- group 16 = QDc = 1e48 (current game range)
+local kothRebirthUnit       = "QDc"  -- label untuk display
+local kothRebirthVal        = 1      -- mantissa value
 local kothRebirthMultiplier = 1
 
 -- ============================================================
@@ -337,7 +372,7 @@ local function setToggle(pill, dot, stroke, on)
 end
 
 -- ============================================================
--- KOTH PANEL - Left: STATUS + MY STATS | Right: CONTROLS
+-- KOTH PANEL
 -- ============================================================
 local kStatusDot, kRowStatus, kRowKing, kRowKingAura, kRowMyAura, kRowResult, kRowMyRank
 local kAutoHitbox, kAutoPill, kAutoDot, kAutoStroke, kAutoStatus
@@ -498,7 +533,6 @@ do
     yL = makeSec(L, "MY STATS", yL)
     kRowMyRank, yL = makeKRow(L, "My Rank:", false, yL)
 
-    -- Instant Rebirth button
     kInstantRebBtn = Instance.new("TextButton")
     kInstantRebBtn.Size            = UDim2.new(0, LEFT_W-PAD*2, 0, 20)
     kInstantRebBtn.Position        = UDim2.new(0, PAD, 0, yL)
@@ -555,7 +589,6 @@ do
 
     local iw = RIGHT_W - PAD*2
 
-    -- Target row
     local kRebInputRow = Instance.new("Frame")
     kRebInputRow.Size            = UDim2.new(0, iw, 0, 20)
     kRebInputRow.Position        = UDim2.new(0, PAD, 0, yR)
@@ -590,7 +623,7 @@ do
     Instance.new("UICorner", kRebInput).CornerRadius = UDim.new(0, 4)
 
     kRebUnitBtn = Instance.new("TextButton")
-    kRebUnitBtn.Size            = UDim2.new(0, 36, 0, 13)
+    kRebUnitBtn.Size            = UDim2.new(0, 52, 0, 13)
     kRebUnitBtn.Position        = UDim2.new(0, 82, 0.5, -6)
     kRebUnitBtn.BackgroundColor3 = PURPLE
     kRebUnitBtn.BorderSizePixel = 0
@@ -602,8 +635,8 @@ do
     Instance.new("UICorner", kRebUnitBtn).CornerRadius = UDim.new(0, 4)
 
     kRebStatus = Instance.new("TextLabel")
-    kRebStatus.Size               = UDim2.new(0, iw-122, 1, 0)
-    kRebStatus.Position           = UDim2.new(0, 122, 0, 0)
+    kRebStatus.Size               = UDim2.new(0, iw-138, 1, 0)
+    kRebStatus.Position           = UDim2.new(0, 138, 0, 0)
     kRebStatus.BackgroundTransparency = 1
     kRebStatus.Text               = "OFF"
     kRebStatus.TextColor3         = RED
@@ -613,7 +646,6 @@ do
     kRebStatus.Parent             = kRebInputRow
     yR = yR + 20 + GAP
 
-    -- Multiplier row
     local kRebMultRow = Instance.new("Frame")
     kRebMultRow.Size            = UDim2.new(0, iw, 0, 20)
     kRebMultRow.Position        = UDim2.new(0, PAD, 0, yR)
@@ -719,7 +751,6 @@ do
         return y + 12 + GAP
     end
 
-    -- ---- LEFT COLUMN ----
     local yL = GAP
     yL = makeLbl(L, "💾 CONFIG", yL, WHITE, 10)
 
@@ -776,7 +807,6 @@ do
     configStatus.Parent             = L
     yL = yL + 12 + GAP
 
-    -- ---- RIGHT COLUMN ----
     local yR = GAP
     yR = makeLbl(R, "Saved configs:", yR, DIM, 8, RIGHT_W)
 
@@ -844,7 +874,7 @@ do
 end
 
 -- ============================================================
--- RESIZE MAIN TO TALLEST PANEL
+-- RESIZE MAIN
 -- ============================================================
 local fullH = PAD_TOP + math.max(kothH, configH) + GAP
 Main.Size     = UDim2.new(0, 320, 0, fullH)
@@ -933,25 +963,48 @@ TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
 switchTab("koth")
 
 -- ============================================================
--- UNIT PICKER POPUP
+-- UNIT PICKER POPUP — ScrollingFrame, support 598 suffix units
 -- ============================================================
-local kRebUnitUnits  = {"Dd","Td","Qad","Qid","Sxd","Spd","Ocd","Nod","Uvg"}
-local kRebUnitValues = {1e39,1e42,1e45,1e48,1e51,1e54,1e57,1e60,1e63}
 
-local function normalizeTarget(rawVal, rawUnit)
-    local absVal = rawVal
-    for i, u in ipairs(kRebUnitUnits) do
-        if u == rawUnit then absVal = rawVal * kRebUnitValues[i]; break end
+-- Build unit list dari game's own suffix algorithm (group 4=T hingga 601=Sxc)
+local kRebUnitList = {}   -- {group_number, "label"}
+for g = 4, 601 do
+    local lbl = getSuffix(g)
+    if lbl:sub(1,1) ~= "e" then
+        table.insert(kRebUnitList, {g, lbl})
     end
-    for i = #kRebUnitUnits, 1, -1 do
-        if absVal >= kRebUnitValues[i] then
-            return absVal / kRebUnitValues[i], kRebUnitUnits[i], absVal
-        end
-    end
-    return absVal / kRebUnitValues[1], kRebUnitUnits[1], absVal
 end
 
--- Shared config file helpers (used by both saveRebirthTarget and config system)
+local function findUnitIdx(label)
+    for i, u in ipairs(kRebUnitList) do
+        if u[2] == label then return i end
+    end
+    return 1
+end
+
+-- normalizeTarget: kerja dalam group space, bukan float
+-- Input: rawVal (number), rawUnit (suffix string)
+-- Output: val, label, group
+local function normalizeTarget(rawVal, rawUnit)
+    local baseGroup = 4
+    for _, u in ipairs(kRebUnitList) do
+        if u[2] == rawUnit then baseGroup = u[1]; break end
+    end
+    local val = rawVal
+    local grp = baseGroup
+    while val >= 1000 and grp < 601 do
+        val = val / 1000; grp = grp + 1
+        while grp <= 601 and getSuffix(grp):sub(1,1) == "e" do grp = grp + 1 end
+    end
+    while val < 1 and grp > 4 do
+        val = val * 1000; grp = grp - 1
+        while grp >= 4 and getSuffix(grp):sub(1,1) == "e" do grp = grp - 1 end
+    end
+    val = math.floor(val * 100 + 0.5) / 100
+    return val, getSuffix(grp), grp
+end
+
+-- Config file helpers
 local CONFIG_FILE     = "autohub_config.json"
 local AUTOLOAD_KEY    = "__autoload__"
 local LAST_TARGET_KEY = "__lasttarget__"
@@ -980,8 +1033,9 @@ local function saveRebirthTarget()
     if isLoading then return end
     local configs = loadConfigFile()
     configs[LAST_TARGET_KEY] = {
-        kothRebirthVal  = kothRebirthVal,
-        kothRebirthUnit = kothRebirthUnit,
+        kothRebirthVal   = kothRebirthVal,
+        kothRebirthUnit  = kothRebirthUnit,
+        kothRebirthGroup = kothRebirthGroup,
     }
     saveConfigFile(configs)
 end
@@ -989,19 +1043,21 @@ end
 local function updateKRebTarget()
     local n = tonumber(kRebInput.Text)
     if n and n > 0 then kothRebirthVal = n end
-    for i, u in ipairs(kRebUnitUnits) do
-        if u == kothRebirthUnit then
-            kothRebirthTarget = kothRebirthVal * kRebUnitValues[i]
+    for _, u in ipairs(kRebUnitList) do
+        if u[2] == kothRebirthUnit then
+            kothRebirthGroup = u[1]
             break
         end
     end
     saveRebirthTarget()
 end
 
--- Unit popup UI
-local UPOP_W      = 160
-local UPOP_ITEM_H = 22
-local UPOP_H      = 32 + (#kRebUnitUnits * (UPOP_ITEM_H+2)) + 32
+-- Popup UI
+local UPOP_W        = 160
+local UPOP_ITEM_H   = 22
+local UPOP_VISIBLE  = 8
+local UPOP_LIST_H   = UPOP_VISIBLE * (UPOP_ITEM_H + 2)
+local UPOP_H        = 34 + UPOP_LIST_H + 8 + 22 + 8
 
 local UBackdrop = Instance.new("TextButton")
 UBackdrop.Size                 = UDim2.new(1, 0, 1, 0)
@@ -1045,40 +1101,61 @@ UPopDiv.BorderSizePixel = 0
 UPopDiv.ZIndex          = 12
 UPopDiv.Parent          = UPopup
 
-local uPopItems     = {}
-local uSelectedIdx  = nil
-local uListStartY   = 36
+-- ScrollingFrame untuk list (support ratusan items)
+local UScrollList = Instance.new("ScrollingFrame")
+UScrollList.Size                  = UDim2.new(1, -8, 0, UPOP_LIST_H)
+UScrollList.Position              = UDim2.new(0, 4, 0, 34)
+UScrollList.BackgroundTransparency = 1
+UScrollList.BorderSizePixel       = 0
+UScrollList.ScrollBarThickness    = 3
+UScrollList.ScrollBarImageColor3  = PURPLE
+UScrollList.CanvasSize            = UDim2.new(0, 0, 0, 0)
+UScrollList.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+UScrollList.ScrollingDirection    = Enum.ScrollingDirection.Y
+UScrollList.ZIndex                = 12
+UScrollList.Parent                = UPopup
 
-for i, unit in ipairs(kRebUnitUnits) do
-    local itemY = uListStartY + (i-1)*(UPOP_ITEM_H+2)
+local UListLayout = Instance.new("UIListLayout", UScrollList)
+UListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UListLayout.Padding   = UDim.new(0, 2)
+
+local uPopItems    = {}
+local uSelectedIdx = nil
+
+for i, u in ipairs(kRebUnitList) do
+    local lbl = u[2]
     local Item = Instance.new("Frame")
-    Item.Size            = UDim2.new(1, -16, 0, UPOP_ITEM_H)
-    Item.Position        = UDim2.new(0, 8, 0, itemY)
+    Item.Name            = "UItem"..i
+    Item.Size            = UDim2.new(1, -4, 0, UPOP_ITEM_H)
     Item.BackgroundColor3 = Color3.fromRGB(25, 20, 38)
     Item.BackgroundTransparency = 1
     Item.BorderSizePixel = 0
-    Item.ZIndex          = 12
-    Item.Parent          = UPopup
-    Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 6)
+    Item.LayoutOrder     = i
+    Item.ZIndex          = 13
+    Item.Parent          = UScrollList
+    Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 5)
+
     local Dot = Instance.new("Frame")
-    Dot.Size            = UDim2.new(0, 7, 0, 7)
-    Dot.Position        = UDim2.new(0, 6, 0.5, -3)
+    Dot.Size            = UDim2.new(0, 6, 0, 6)
+    Dot.Position        = UDim2.new(0, 5, 0.5, -3)
     Dot.BackgroundColor3 = DIM
     Dot.BorderSizePixel = 0
-    Dot.ZIndex          = 13
+    Dot.ZIndex          = 14
     Dot.Parent          = Item
     Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+
     local NameLbl = Instance.new("TextLabel")
-    NameLbl.Size               = UDim2.new(1, -20, 1, 0)
-    NameLbl.Position           = UDim2.new(0, 18, 0, 0)
+    NameLbl.Size               = UDim2.new(1, -30, 1, 0)
+    NameLbl.Position           = UDim2.new(0, 16, 0, 0)
     NameLbl.BackgroundTransparency = 1
-    NameLbl.Text               = unit
+    NameLbl.Text               = lbl
     NameLbl.TextColor3         = WHITE
     NameLbl.TextSize           = 11
     NameLbl.Font               = Enum.Font.GothamBold
     NameLbl.TextXAlignment     = Enum.TextXAlignment.Left
-    NameLbl.ZIndex             = 13
+    NameLbl.ZIndex             = 14
     NameLbl.Parent             = Item
+
     local CheckLbl = Instance.new("TextLabel")
     CheckLbl.Size               = UDim2.new(0, 14, 1, 0)
     CheckLbl.Position           = UDim2.new(1, -16, 0, 0)
@@ -1087,18 +1164,20 @@ for i, unit in ipairs(kRebUnitUnits) do
     CheckLbl.TextColor3         = Color3.fromRGB(100, 220, 100)
     CheckLbl.TextSize           = 10
     CheckLbl.Font               = Enum.Font.GothamBold
-    CheckLbl.ZIndex             = 13
+    CheckLbl.ZIndex             = 14
     CheckLbl.Parent             = Item
+
     local Hitbox = Instance.new("TextButton")
     Hitbox.Size                 = UDim2.new(1, 0, 1, 0)
     Hitbox.BackgroundTransparency = 1
     Hitbox.Text                 = ""
-    Hitbox.ZIndex               = 14
+    Hitbox.ZIndex               = 15
     Hitbox.Parent               = Item
+
     uPopItems[i] = {frame=Item, dot=Dot, nameLbl=NameLbl, checkLbl=CheckLbl, hitbox=Hitbox}
 end
 
-local uBtnY = uListStartY + (#kRebUnitUnits*(UPOP_ITEM_H+2)) + 6
+local uBtnY = 34 + UPOP_LIST_H + 6
 
 local UCancelBtn = Instance.new("TextButton")
 UCancelBtn.Size            = UDim2.new(0.44, 0, 0, 22)
@@ -1128,25 +1207,31 @@ Instance.new("UICorner", USetBtn).CornerRadius = UDim.new(0, 6)
 
 local function refreshUPopItems()
     for i, item in ipairs(uPopItems) do
-        local isSel = uSelectedIdx == i
+        local isSel = (uSelectedIdx == i)
         item.frame.BackgroundTransparency = isSel and 0 or 1
         item.frame.BackgroundColor3       = isSel and Color3.fromRGB(50,35,80) or Color3.fromRGB(25,20,38)
         item.dot.BackgroundColor3         = isSel and PURPLE or DIM
-        item.checkLbl.Text                = (kRebUnitUnits[i] == kothRebirthUnit) and "✓" or ""
+        item.checkLbl.Text                = (kRebUnitList[i][2] == kothRebirthUnit) and "✓" or ""
     end
 end
 
 local function openUnitPopup()
-    uSelectedIdx = nil
-    for i, u in ipairs(kRebUnitUnits) do
-        if u == kothRebirthUnit then uSelectedIdx = i; break end
-    end
+    uSelectedIdx = findUnitIdx(kothRebirthUnit)
     refreshUPopItems()
-    UBackdrop.Visible = true; UPopup.Visible = true
+    -- Auto-scroll ke current unit
+    if uSelectedIdx then
+        local targetY = (uSelectedIdx - 1) * (UPOP_ITEM_H + 2)
+        local center  = math.floor(UPOP_LIST_H / 2)
+        UScrollList.CanvasPosition = Vector2.new(0, math.max(0, targetY - center))
+    end
+    UBackdrop.Visible = true
+    UPopup.Visible    = true
 end
 
 local function closeUnitPopup()
-    UBackdrop.Visible = false; UPopup.Visible = false; uSelectedIdx = nil
+    UBackdrop.Visible = false
+    UPopup.Visible    = false
+    uSelectedIdx      = nil
 end
 
 for i, item in ipairs(uPopItems) do
@@ -1154,13 +1239,15 @@ for i, item in ipairs(uPopItems) do
         uSelectedIdx = i; refreshUPopItems()
     end)
 end
+
 UCancelBtn.MouseButton1Click:Connect(closeUnitPopup)
 UBackdrop.MouseButton1Click:Connect(closeUnitPopup)
 kRebUnitBtn.MouseButton1Click:Connect(openUnitPopup)
 
 USetBtn.MouseButton1Click:Connect(function()
     if not uSelectedIdx then closeUnitPopup(); return end
-    kothRebirthUnit  = kRebUnitUnits[uSelectedIdx]
+    kothRebirthUnit  = kRebUnitList[uSelectedIdx][2]
+    kothRebirthGroup = kRebUnitList[uSelectedIdx][1]
     kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
     updateKRebTarget()
     closeUnitPopup()
@@ -1209,6 +1296,7 @@ local function getCurrentSettings()
         kothRebirthMultiplier = kothRebirthMultiplier,
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
+        kothRebirthGroup      = kothRebirthGroup,
     }
 end
 
@@ -1241,6 +1329,9 @@ local function applySettings(s)
     if s.kothRebirthUnit ~= nil then
         kothRebirthUnit  = s.kothRebirthUnit
         kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
+    end
+    if s.kothRebirthGroup ~= nil then
+        kothRebirthGroup = s.kothRebirthGroup
     end
     updateKRebTarget()
 end
@@ -1610,8 +1701,8 @@ task.spawn(function()
     killEvent.Event:Connect(function() killed = true end)
     while not killed do
         if autoKothRebirth then
-            local aura = getAura()
-            if aura >= kothRebirthTarget then
+            -- Guna getAuraGroup() untuk comparison — works untuk semua nilai termasuk > 1e308
+            if getAuraGroup() >= kothRebirthGroup then
                 if RequestRebirth then
                     pcall(function() RequestRebirth:InvokeServer() end)
                 end
@@ -1619,13 +1710,14 @@ task.spawn(function()
                 kRebCount.Text = "KOTH Rebirths: " .. kothRebirthCount
 
                 if kothRebirthMultiplier > 1 then
-                    local newVal, newUnit = normalizeTarget(
+                    local newVal, newUnit, newGrp = normalizeTarget(
                         kothRebirthVal * kothRebirthMultiplier,
                         kothRebirthUnit
                     )
                     newVal           = math.floor(newVal * 100 + 0.5) / 100
                     kothRebirthVal   = newVal
                     kothRebirthUnit  = newUnit
+                    kothRebirthGroup = newGrp
                     kRebInput.Text   = tostring(kothRebirthVal)
                     kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
                     updateKRebTarget()
@@ -1643,7 +1735,6 @@ end)
 task.spawn(function()
     task.wait(0.5)
     local configs = loadConfigFile()
-    -- Auto-load config jika ada
     if configs and configs[AUTOLOAD_KEY] then
         local autoName = configs[AUTOLOAD_KEY]
         if configs[autoName] then
@@ -1654,12 +1745,12 @@ task.spawn(function()
             setConfigStatus("⚡ Auto loaded: " .. autoName)
         end
     end
-    -- Selalu load last rebirth target, tak kira ada auto-load atau tak
     local lt = configs and configs[LAST_TARGET_KEY]
     if lt then
         isLoading = true
         if lt.kothRebirthVal  then kothRebirthVal  = lt.kothRebirthVal;  kRebInput.Text   = tostring(kothRebirthVal)  end
         if lt.kothRebirthUnit then kothRebirthUnit = lt.kothRebirthUnit; kRebUnitBtn.Text = kothRebirthUnit .. " ▾" end
+        if lt.kothRebirthGroup then kothRebirthGroup = lt.kothRebirthGroup end
         updateKRebTarget()
         isLoading = false
     end
@@ -1685,4 +1776,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension loaded. target rebirth fixed")
+print("Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
