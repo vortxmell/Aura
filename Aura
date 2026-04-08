@@ -98,16 +98,20 @@ local function getAura()
     return player:GetAttribute("Aura") or 0
 end
 
--- Dapat "aura group" (suffix tier) untuk comparison rebirth target
+-- Dapat aura sebagai (group, mantissa) untuk comparison rebirth target yang accurate
 -- Guna Aura_Exponent attribute kalau ada (lebih accurate untuk nilai > 1e308)
-local function getAuraGroup()
+local function getAuraTier()
     local exp = player:GetAttribute("Aura_Exponent")
     if type(exp) == "number" and exp >= 0 then
-        return math.floor(exp / 3)
+        local grp      = math.floor(exp / 3)
+        local mantissa = 10 ^ (exp - grp * 3)
+        return grp, mantissa
     end
     local aura = player:GetAttribute("Aura") or 0
-    if aura <= 0 then return 0 end
-    return math.floor(math.log10(aura) / 3)
+    if aura <= 0 then return 0, 0 end
+    local grp      = math.floor(math.log10(aura) / 3)
+    local mantissa = aura / (10 ^ (grp * 3))
+    return grp, mantissa
 end
 
 local function teleport(pos)
@@ -1701,8 +1705,12 @@ task.spawn(function()
     killEvent.Event:Connect(function() killed = true end)
     while not killed do
         if autoKothRebirth then
-            -- Guna getAuraGroup() untuk comparison — works untuk semua nilai termasuk > 1e308
-            if getAuraGroup() >= kothRebirthGroup then
+            -- Fix: compare group DAN mantissa — supaya "160 TDc" betul-betul tunggu 160 TDc,
+            -- bukan trigger bila masuk group TDc sahaja (e.g. 1.91 TDc dah >= group TDc)
+            local curGrp, curMant = getAuraTier()
+            local rebirthReached  = (curGrp > kothRebirthGroup)
+                or (curGrp == kothRebirthGroup and curMant >= kothRebirthVal)
+            if rebirthReached then
                 if RequestRebirth then
                     pcall(function() RequestRebirth:InvokeServer() end)
                 end
@@ -1776,4 +1784,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803). Fixing target rebirth")
