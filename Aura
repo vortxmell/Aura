@@ -1732,25 +1732,39 @@ end)
 
 task.spawn(function()
     -- Auto Notif Rebirth loop
-    local RunService   = game:GetService("RunService")
-    local playerGui    = player:WaitForChild("PlayerGui")
-    local topBar       = nil
+    local playerGui     = player:WaitForChild("PlayerGui")
+    local topBar        = nil
     local notifDebounce = false
-
-    pcall(function()
-        topBar = playerGui:WaitForChild("Hud", 15):WaitForChild("TopBar", 15)
-    end)
-
-    local killed = false
+    local killed        = false
     killEvent.Event:Connect(function() killed = true end)
 
+    -- Wait for TopBar (max 30s)
+    local tbOk = pcall(function()
+        topBar = playerGui:WaitForChild("Hud", 30):WaitForChild("TopBar", 30)
+    end)
+    if not tbOk or not topBar then
+        warn("[AutoHub] NotifRebirth: TopBar not found, feature disabled")
+        return
+    end
+
+    -- Wait for RequestRebirth remote (max 30s)
+    local elapsed = 0
+    while not RequestRebirth and elapsed < 30 and not killed do
+        task.wait(0.5)
+        elapsed = elapsed + 0.5
+    end
+    if not RequestRebirth then
+        warn("[AutoHub] NotifRebirth: RequestRebirth remote not found, feature disabled")
+        return
+    end
+
     while not killed and ScreenGui.Parent do
-        if autoNotifRebirth and topBar and RequestRebirth then
+        if autoNotifRebirth then
             local currentY = topBar.Position.Y.Scale
             if currentY > 0.0 and not notifDebounce then
                 notifDebounce = true
                 pcall(function() RequestRebirth:InvokeServer() end)
-                repeat task.wait(0.1) until not topBar or topBar.Position.Y.Scale <= 0.0 or killed
+                repeat task.wait(0.1) until topBar.Position.Y.Scale <= 0.0 or killed
                 notifDebounce = false
             end
         end
@@ -1842,4 +1856,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension v4 loaded -- New auto rebirth toggle)
+print("Aura Ascension v4 loaded. Auto rebirth notif toggle)
