@@ -1,4 +1,20 @@
 -- Auto Hub v3 - KOTH + Config Only
+
+-- ============================================================
+-- SINGLE INSTANCE GUARD
+-- ============================================================
+if _G.AutoHubKill then
+    _G.AutoHubKill:Fire()
+    _G.AutoHubKill:Destroy()
+end
+_G.AutoHubKill = Instance.new("BindableEvent")
+local killEvent = _G.AutoHubKill
+
+-- Destroy old GUI if exists
+local oldGui = (game:GetService("CoreGui"):FindFirstChild("AutoHub"))
+    or (game.Players.LocalPlayer.PlayerGui:FindFirstChild("AutoHub"))
+if oldGui then oldGui:Destroy() end
+
 local player = game.Players.LocalPlayer
 local RS = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -770,7 +786,6 @@ local kRebUnitValues = {1e39,1e42,1e45,1e48,1e51,1e54,1e57,1e60,1e63}
 
 -- ============================================================
 -- normalizeTarget — convert raw number to best unit+val
--- Example: 1000 Qid → 1 Sxd
 -- ============================================================
 local function normalizeTarget(rawVal, rawUnit)
     local absVal = rawVal
@@ -802,8 +817,6 @@ local function saveRebirthTarget()
             local ok3, t = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
             if ok3 and t then configs = t end
         end
-        -- FIX: Jangan save multiplier dalam __lasttarget__
-        -- Multiplier diurus oleh named config je
         configs[LAST_TARGET_KEY_EARLY] = {
             kothRebirthVal  = kothRebirthVal,
             kothRebirthUnit = kothRebirthUnit,
@@ -956,7 +969,6 @@ kRebMultInput.FocusLost:Connect(function()
         kRebMultInput.Text = tostring(kothRebirthMultiplier)
         return
     end
-    -- Round to 1 decimal
     kothRebirthMultiplier = math.floor(n * 10 + 0.5) / 10
     kRebMultInput.Text = tostring(kothRebirthMultiplier)
 end)
@@ -1011,8 +1023,7 @@ local function getCurrentSettings()
         autoKOTH               = autoKOTH,
         autoServerHop          = autoServerHop,
         autoKothRebirth        = autoKothRebirth,
-        kothRebirthMultiplier  = kothRebirthMultiplier,  -- multiplier saved in named config
-        -- kothRebirthVal & kothRebirthUnit diurus __lasttarget__ auto-save
+        kothRebirthMultiplier  = kothRebirthMultiplier,
     }
 end
 
@@ -1038,8 +1049,6 @@ local function applySettings(s)
         kothRebirthMultiplier = s.kothRebirthMultiplier
         kRebMultInput.Text = tostring(kothRebirthMultiplier)
     end
-    -- kothRebirthVal & kothRebirthUnit tidak di-restore dari named config
-    -- ia diurus oleh __lasttarget__ dalam INIT
     updateKRebTarget()
 end
 
@@ -1377,6 +1386,8 @@ end)
 
 CloseBtn.MouseButton1Click:Connect(function()
     autoKOTH = false
+    autoKothRebirth = false
+    killEvent:Fire()
     ScreenGui:Destroy()
 end)
 
@@ -1394,7 +1405,9 @@ end)
 -- AUTO KOTH REBIRTH LOOP
 -- ============================================================
 task.spawn(function()
-    while true do
+    local killed = false
+    killEvent.Event:Connect(function() killed = true end)
+    while not killed do
         if autoKothRebirth then
             local aura = getAura()
             if aura >= kothRebirthTarget then
@@ -1410,7 +1423,6 @@ task.spawn(function()
                         kothRebirthVal * kothRebirthMultiplier,
                         kothRebirthUnit
                     )
-                    -- Round to 2 decimal places to keep display clean
                     newVal = math.floor(newVal * 100 + 0.5) / 100
                     kothRebirthVal  = newVal
                     kothRebirthUnit = newUnit
@@ -1436,16 +1448,11 @@ task.spawn(function()
         local autoName = configs[AUTOLOAD_KEY]
         if configs[autoName] then
             applySettings(configs[autoName])
-            -- Restore last used target val+unit from __lasttarget__
-            -- NOTE: multiplier TIDAK di-restore dari __lasttarget__
-            -- Multiplier ikut named config je (sudah di-apply dalam applySettings di atas)
             local lt = configs[LAST_TARGET_KEY]
             if lt then
                 isLoading = true
                 if lt.kothRebirthVal  then kothRebirthVal  = lt.kothRebirthVal;  kRebInput.Text   = tostring(kothRebirthVal) end
                 if lt.kothRebirthUnit then kothRebirthUnit = lt.kothRebirthUnit; kRebUnitBtn.Text = kothRebirthUnit .. " ▾" end
-                -- FIX: Baris lt.kothRebirthMultiplier DIBUANG dari sini
-                -- Supaya multiplier dari named config tidak di-overwrite oleh __lasttarget__
                 updateKRebTarget()
                 isLoading = false
             end
