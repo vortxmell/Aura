@@ -90,9 +90,9 @@ local autoServerHop         = true
 local forceHop              = false
 local kothHopping           = false
 local autoKothRebirth       = false
-local kothRebirthTarget     = 500e39
-local kothRebirthUnit       = "Dd"
-local kothRebirthVal        = 500
+local kothRebirthTarget     = 1e39   -- fallback minimum, akan overwrite oleh saved target
+local kothRebirthUnit       = "Dd"   -- fallback, akan overwrite oleh saved target
+local kothRebirthVal        = 1      -- fallback, akan overwrite oleh saved target
 local kothRebirthMultiplier = 1
 
 -- ============================================================
@@ -581,7 +581,7 @@ do
     kRebInput.Position          = UDim2.new(0, 38, 0.5, -6)
     kRebInput.BackgroundColor3  = Color3.fromRGB(30, 26, 44)
     kRebInput.BorderSizePixel   = 0
-    kRebInput.Text              = "500"
+    kRebInput.Text              = tostring(kothRebirthVal)
     kRebInput.TextColor3        = WHITE
     kRebInput.TextSize          = 9
     kRebInput.Font              = Enum.Font.GothamBold
@@ -594,7 +594,7 @@ do
     kRebUnitBtn.Position        = UDim2.new(0, 82, 0.5, -6)
     kRebUnitBtn.BackgroundColor3 = PURPLE
     kRebUnitBtn.BorderSizePixel = 0
-    kRebUnitBtn.Text            = "Dd ▾"
+    kRebUnitBtn.Text            = kothRebirthUnit .. " ▾"
     kRebUnitBtn.TextColor3      = WHITE
     kRebUnitBtn.TextSize        = 8
     kRebUnitBtn.Font            = Enum.Font.GothamBold
@@ -1207,6 +1207,8 @@ local function getCurrentSettings()
         autoServerHop         = autoServerHop,
         autoKothRebirth       = autoKothRebirth,
         kothRebirthMultiplier = kothRebirthMultiplier,
+        kothRebirthVal        = kothRebirthVal,
+        kothRebirthUnit       = kothRebirthUnit,
     }
 end
 
@@ -1231,6 +1233,14 @@ local function applySettings(s)
     if s.kothRebirthMultiplier ~= nil then
         kothRebirthMultiplier = s.kothRebirthMultiplier
         kRebMultInput.Text    = tostring(kothRebirthMultiplier)
+    end
+    if s.kothRebirthVal ~= nil then
+        kothRebirthVal = s.kothRebirthVal
+        kRebInput.Text = tostring(kothRebirthVal)
+    end
+    if s.kothRebirthUnit ~= nil then
+        kothRebirthUnit  = s.kothRebirthUnit
+        kRebUnitBtn.Text = kothRebirthUnit .. " ▾"
     end
     updateKRebTarget()
 end
@@ -1633,25 +1643,27 @@ end)
 task.spawn(function()
     task.wait(0.5)
     local configs = loadConfigFile()
+    -- Auto-load config jika ada
     if configs and configs[AUTOLOAD_KEY] then
         local autoName = configs[AUTOLOAD_KEY]
         if configs[autoName] then
+            isLoading = true
             applySettings(configs[autoName])
-            local lt = configs[LAST_TARGET_KEY]
-            if lt then
-                isLoading = true
-                if lt.kothRebirthVal  then kothRebirthVal  = lt.kothRebirthVal;  kRebInput.Text   = tostring(kothRebirthVal)  end
-                if lt.kothRebirthUnit then kothRebirthUnit = lt.kothRebirthUnit; kRebUnitBtn.Text = kothRebirthUnit .. " ▾" end
-                updateKRebTarget()
-                isLoading = false
-            end
+            isLoading = false
             selectedCfg = autoName
             setConfigStatus("⚡ Auto loaded: " .. autoName)
-            rebuildConfigList()
         end
-    else
-        rebuildConfigList()
     end
+    -- Selalu load last rebirth target, tak kira ada auto-load atau tak
+    local lt = configs and configs[LAST_TARGET_KEY]
+    if lt then
+        isLoading = true
+        if lt.kothRebirthVal  then kothRebirthVal  = lt.kothRebirthVal;  kRebInput.Text   = tostring(kothRebirthVal)  end
+        if lt.kothRebirthUnit then kothRebirthUnit = lt.kothRebirthUnit; kRebUnitBtn.Text = kothRebirthUnit .. " ▾" end
+        updateKRebTarget()
+        isLoading = false
+    end
+    rebuildConfigList()
 end)
 
 -- ============================================================
@@ -1673,4 +1685,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension loaded")
+print("Aura Ascension loaded. target rebirth fixed")
