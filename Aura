@@ -1,4 +1,4 @@
--- Aura Ascension v2
+-- Aura Ascension
 
 -- ============================================================
 -- SINGLE INSTANCE GUARD
@@ -1282,8 +1282,20 @@ end
 -- ============================================================
 -- SERVER HOP
 -- ============================================================
+local lastHopTime = 0
+local hopCount    = 0
+
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
+    local cooldown = math.min(12 + (hopCount * 2), 25)
+    if tick() - lastHopTime < cooldown then
+        local remaining = math.ceil(cooldown - (tick() - lastHopTime))
+        kAutoStatus.Text       = "⏳ Hop cooldown " .. remaining .. "s..."
+        kAutoStatus.TextColor3 = DIM
+        return
+    end
+    lastHopTime = tick()
+    hopCount   += 1
     kothHopping = true
     kAutoStatus.Text      = "🔄 Scanning... (" .. (reason or "?") .. ")"
     kAutoStatus.TextColor3 = WARN
@@ -1296,8 +1308,9 @@ local function hopToLeastPopulated(reason)
         local cursor       = ""
         local totalScanned = 0
 
-        for page = 1, 5 do
-            kAutoStatus.Text = string.format("🔍 Scanning page %d/5...", page)
+        local maxPages = math.random(2, 5)
+        for page = 1, maxPages do
+            kAutoStatus.Text = string.format("🔍 Scanning page %d/%d...", page, maxPages)
 
             local url = string.format(
                 "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
@@ -1354,7 +1367,7 @@ local function hopToLeastPopulated(reason)
                 "🚀 Hopping -> %d player(s) [scanned %d]",
                 target.playing, totalScanned
             )
-            task.wait(1)
+            task.wait(1.5 + math.random() * 2)
             pcall(TeleportService.TeleportToPlaceInstance, TeleportService, placeId, target.id, player)
         else
             kAutoStatus.Text      = string.format("❌ No server found (%d scanned)", totalScanned)
@@ -1660,4 +1673,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension V2 loaded")
+print("Aura Ascension loaded")
