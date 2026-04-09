@@ -141,6 +141,7 @@ local autoCZTeleport        = false
 local autoCZServerHop       = false
 local autoCZGuard           = false  -- NEW: CZ Guard
 local czInsideZone          = false
+local czMinMulti            = 3      -- default minimum multi threshold (always active)
 
 -- ============================================================
 -- CONSTANTS
@@ -762,10 +763,11 @@ end
 -- ============================================================
 -- CURSED ZONE PANEL  (single column, no right column)
 -- ============================================================
-local czStatusDot, czRowStatus, czRowTimer, czRowLocation
+local czStatusDot, czRowStatus, czRowTimer, czRowLocation, czRowMulti
 local czTpHitbox,  czTpPill,  czTpDot,  czTpStroke
 local czGuardHitbox, czGuardPill, czGuardDot, czGuardStroke
 local czHopHitbox, czHopPill, czHopDot, czHopStroke   -- NEW: server hop toggle
+local czMultiInput  -- multi threshold inputbox
 local czTpStatus
 local czH
 
@@ -896,21 +898,71 @@ do
 
     y = makeHDiv(PanelCZ, y)
     czRowLocation, y = makeKRow(PanelCZ, "Location:", false, y)
+    czRowMulti,    y = makeKRow(PanelCZ, "Multi:",    true,  y)
 
     y = makeHDiv(PanelCZ, y)
-    y = makeSec(PanelCZ, "AUTO TELEPORT", y)
 
-    czTpHitbox, czTpPill, czTpDot, czTpStroke, y = makeToggleFull(PanelCZ, "Auto TP ke Cursed Zone", y)
-
-    -- NEW: Auto Server Hop toggle row
-    y = makeHDiv(PanelCZ, y)
-    y = makeSec(PanelCZ, "AUTO SERVER HOP", y)
+    czTpHitbox, czTpPill, czTpDot, czTpStroke, y = makeToggleFull(PanelCZ, "Auto TP to CZ", y)
     czHopHitbox, czHopPill, czHopDot, czHopStroke, y = makeToggleFull(PanelCZ, "Auto Server Hop CZ", y)
-
-    -- NEW: CZ Guard toggle
-    y = makeHDiv(PanelCZ, y)
-    y = makeSec(PanelCZ, "CURSED ZONE GUARD", y)
     czGuardHitbox, czGuardPill, czGuardDot, czGuardStroke, y = makeToggleFull(PanelCZ, "Auto Re-enter CZ", y)
+
+    -- Multi Hop row — label + inputbox only (always-active condition, no toggle needed)
+    do
+        local rowH = ROW_H
+
+        local MultiHopRow = Instance.new("Frame")
+        MultiHopRow.Size            = UDim2.new(1, -PAD*2, 0, rowH)
+        MultiHopRow.Position        = UDim2.new(0, PAD, 0, y)
+        MultiHopRow.BackgroundColor3 = PANEL
+        MultiHopRow.BorderSizePixel = 0
+        MultiHopRow.Parent          = PanelCZ
+        Instance.new("UICorner", MultiHopRow).CornerRadius = UDim.new(0, 6)
+        local MultiHopStroke = Instance.new("UIStroke", MultiHopRow)
+        MultiHopStroke.Color     = Color3.fromRGB(160, 60, 220)
+        MultiHopStroke.Thickness = 1
+
+        local MultiHopLabel = Instance.new("TextLabel")
+        MultiHopLabel.Size               = UDim2.new(1, -50, 1, 0)
+        MultiHopLabel.Position           = UDim2.new(0, 8, 0, 0)
+        MultiHopLabel.BackgroundTransparency = 1
+        MultiHopLabel.Text               = "🔢 Hop if Multi <"
+        MultiHopLabel.TextColor3         = Color3.fromRGB(210, 160, 255)
+        MultiHopLabel.TextSize           = 9
+        MultiHopLabel.Font               = Enum.Font.GothamBold
+        MultiHopLabel.TextXAlignment     = Enum.TextXAlignment.Left
+        MultiHopLabel.Parent             = MultiHopRow
+
+        czMultiInput = Instance.new("TextBox")
+        czMultiInput.Size             = UDim2.new(0, 36, 0, rowH - 4)
+        czMultiInput.Position         = UDim2.new(1, -42, 0.5, -(rowH-4)/2)
+        czMultiInput.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
+        czMultiInput.BorderSizePixel  = 0
+        czMultiInput.Text             = tostring(czMinMulti)
+        czMultiInput.TextColor3       = Color3.fromRGB(255, 220, 100)
+        czMultiInput.TextSize         = 10
+        czMultiInput.Font             = Enum.Font.GothamBold
+        czMultiInput.PlaceholderText  = "3"
+        czMultiInput.ClearTextOnFocus = true
+        czMultiInput.Parent           = MultiHopRow
+        Instance.new("UICorner", czMultiInput).CornerRadius = UDim.new(0, 4)
+        local czMultiInputStroke = Instance.new("UIStroke", czMultiInput)
+        czMultiInputStroke.Color     = Color3.fromRGB(160, 80, 220)
+        czMultiInputStroke.Thickness = 1
+
+        -- "x" suffix label
+        local xLbl = Instance.new("TextLabel")
+        xLbl.Size               = UDim2.new(0, 10, 1, 0)
+        xLbl.Position           = UDim2.new(1, -8, 0, 0)
+        xLbl.BackgroundTransparency = 1
+        xLbl.Text               = "x"
+        xLbl.TextColor3         = Color3.fromRGB(180, 140, 220)
+        xLbl.TextSize           = 9
+        xLbl.Font               = Enum.Font.GothamBold
+        xLbl.TextXAlignment     = Enum.TextXAlignment.Left
+        xLbl.Parent             = MultiHopRow
+
+        y = y + rowH + GAP
+    end
 
     czTpStatus = Instance.new("TextLabel")
     czTpStatus.Size               = UDim2.new(1, -PAD*2, 0, STAT_H)
@@ -1243,6 +1295,22 @@ local function updateCZPanel()
             czRowLocation.TextColor3 = DIM
         end
 
+        -- Read multi from WarnBBGui
+        local multiText = "—"
+        pcall(function()
+            local czFolder = workspace:FindFirstChild("ActiveCursedZone")
+            if czFolder then
+                local att = czFolder:FindFirstChild("Attachment")
+                local gui = att and att:FindFirstChild("WarnBBGui")
+                local lbl = gui and gui:FindFirstChild("MulitText")
+                if lbl and lbl.Text and lbl.Text ~= "" then
+                    multiText = lbl.Text
+                end
+            end
+        end)
+        czRowMulti.Text      = multiText
+        czRowMulti.TextColor3 = Color3.fromRGB(255, 210, 80)
+
         if autoCZTeleport and czPos and not czTeleportDebounce then
             czTeleportDebounce = true
             teleport(czPos + Vector3.new(0, 5, 0))
@@ -1266,6 +1334,9 @@ local function updateCZPanel()
 
         czRowLocation.Text = "—"
         czRowLocation.TextColor3 = DIM
+
+        czRowMulti.Text      = "—"
+        czRowMulti.TextColor3 = DIM
 
         if autoCZTeleport and not autoCZServerHop then
             czTpStatus.Text      = "⏳ Tunggu zone spawn..."
@@ -1654,6 +1725,16 @@ czGuardHitbox.MouseButton1Click:Connect(function()
     end
 end)
 
+czMultiInput.FocusLost:Connect(function()
+    local n = tonumber(czMultiInput.Text)
+    if not n or n < 1 then
+        czMultiInput.Text = tostring(czMinMulti)
+        return
+    end
+    czMinMulti = math.floor(n)
+    czMultiInput.Text = tostring(czMinMulti)
+end)
+
 -- ============================================================
 -- CONFIG SYSTEM
 -- ============================================================
@@ -1674,6 +1755,7 @@ local function getCurrentSettings()
         autoCZTeleport        = autoCZTeleport,
         autoCZServerHop       = autoCZServerHop,
         autoCZGuard           = autoCZGuard,
+        czMinMulti            = czMinMulti,
         kothRebirthMultiplier = kothRebirthMultiplier,
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
@@ -1717,6 +1799,10 @@ local function applySettings(s)
     if s.autoCZGuard ~= nil then
         autoCZGuard = s.autoCZGuard
         setToggle(czGuardPill, czGuardDot, czGuardStroke, autoCZGuard)
+    end
+    if s.czMinMulti ~= nil then
+        czMinMulti = s.czMinMulti
+        czMultiInput.Text = tostring(czMinMulti)
     end
     if s.kothRebirthMultiplier ~= nil then
         kothRebirthMultiplier = s.kothRebirthMultiplier
@@ -2265,6 +2351,35 @@ task.spawn(function()
             else
                 -- Zone spawned → reset hopScheduled, check proximity player
                 hopScheduled = false
+
+                -- Check multi — kalau kurang dari threshold, hop terus (always active)
+                if not hopScheduled then
+                    local currentMulti = nil
+                    pcall(function()
+                        local czFolder = workspace:FindFirstChild("ActiveCursedZone")
+                        if czFolder then
+                            local att = czFolder:FindFirstChild("Attachment")
+                            local gui = att and att:FindFirstChild("WarnBBGui")
+                            local lbl = gui and gui:FindFirstChild("MulitText")
+                            if lbl and lbl.Text and lbl.Text ~= "" then
+                                -- Parse nilai dari text e.g. "3x" atau "3"
+                                local n = lbl.Text:match("(%d+%.?%d*)")
+                                if n then currentMulti = tonumber(n) end
+                            end
+                        end
+                    end)
+                    if currentMulti ~= nil and currentMulti < czMinMulti then
+                        hopScheduled = true
+                        czTpStatus.Text       = "🔢 Multi " .. currentMulti .. "x < " .. czMinMulti .. "x — hopping!"
+                        czTpStatus.TextColor3 = Color3.fromRGB(255, 140, 40)
+                        task.wait(1.5)
+                        if autoCZServerHop then
+                            doServerHop("Multi rendah " .. currentMulti .. "x", czTpStatus)
+                        end
+                        hopScheduled = false
+                    end
+                end
+
                 if czPos and czRadius then
                     local c   = player.Character
                     local hrp = c and c:FindFirstChild("HumanoidRootPart")
@@ -2382,4 +2497,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("Aura Ascension AutoHub v9 loaded. Delta server hop fix applied.")
+print("Aura Ascension AutoHub v10 loaded. Multi Hop CZ always-active (no toggle).")
