@@ -1512,7 +1512,28 @@ local function hopToLeastPopulated(reason)
                 target.playing, totalScanned
             )
             task.wait(1.5 + math.random() * 2)
-            pcall(TeleportService.TeleportToPlaceInstance, TeleportService, placeId, target.id, player)
+
+            -- FIX: Guna pcall supaya executor tak crash, dengan fallback Teleport biasa
+            local hopOk = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, target.id, player)
+            end)
+
+            if not hopOk then
+                -- Fallback: cuba Teleport biasa kalau TeleportToPlaceInstance gagal
+                kAutoStatus.Text      = "⚠ Retrying with fallback..."
+                kAutoStatus.TextColor3 = WARN
+                task.wait(1)
+                local fallbackOk = pcall(function()
+                    TeleportService:Teleport(placeId, player)
+                end)
+                if not fallbackOk then
+                    kAutoStatus.Text      = "❌ Teleport failed — retry in 10s"
+                    kAutoStatus.TextColor3 = RED
+                    task.wait(10)
+                    kothHopping = false  -- FIX: reset supaya boleh cuba hop lagi
+                end
+            end
+            -- Kalau berjaya, player akan teleport keluar — kothHopping tak perlu reset
         else
             kAutoStatus.Text      = string.format("❌ No server found (%d scanned)", totalScanned)
             kAutoStatus.TextColor3 = RED
