@@ -1692,6 +1692,44 @@ kHopHitbox.MouseButton1Click:Connect(function()
 end)
 
 kHopBtn.MouseButton1Click:Connect(function()
+    -- DEBUG: Test satu-satu untuk cari punca crash
+    kAutoStatus.Text = "DEBUG: Button pressed"
+    kAutoStatus.TextColor3 = WARN
+    task.wait(0.5)
+    
+    -- Test 1: Adakah task.spawn je yang crash?
+    kAutoStatus.Text = "DEBUG: Testing task.spawn..."
+    task.spawn(function()
+        kAutoStatus.Text = "DEBUG: Inside task.spawn OK"
+        task.wait(0.5)
+        
+        -- Test 2: Adakah HTTP request yang crash?
+        kAutoStatus.Text = "DEBUG: Testing HTTP..."
+        local ok, result = pcall(function()
+            return request({
+                Url = "https://games.roblox.com/v1/games/" .. tostring(placeId) .. "/servers/Public?limit=10",
+                Method = "GET",
+                Headers = { ["Accept"] = "application/json" }
+            })
+        end)
+        
+        if not ok then
+            kAutoStatus.Text = "DEBUG: HTTP FAILED - " .. tostring(result)
+            kAutoStatus.TextColor3 = RED
+            return
+        end
+        
+        kAutoStatus.Text = "DEBUG: HTTP OK, testing teleport..."
+        task.wait(1)
+        
+        -- Test 3: Adakah TeleportService yang crash?
+        kAutoStatus.Text = "DEBUG: Testing TeleportService..."
+        local tok = pcall(function()
+            TeleportService:TeleportToPlaceInstance(placeId, game.JobId)
+        end)
+        kAutoStatus.Text = "DEBUG: Teleport pcall = " .. tostring(tok)
+    end)
+end)
     forceHop = true
 end)
 
@@ -1933,4 +1971,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test3 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("test1 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
