@@ -48,8 +48,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- NUMBER FORMATTING — ported dari game source (SuffixBoardFrame)
--- Support sampai 1e1803 (Sxc), sama exact dengan game
+-- NUMBER FORMATTING
 -- ============================================================
 local _s0 = {[0]="","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No"}
 local _s1 = {[0]="","U","D","T","q","Q","s","S","O","N"}
@@ -63,7 +62,6 @@ local _s2 = {
     "Sxc"
 }
 
--- Group g → suffix label (g=1→K, g=16→QDc, g=601→Sxc)
 local function getSuffix(g)
     local s = _s0[g]
     if s ~= nil then return s end
@@ -75,7 +73,6 @@ local function getSuffix(g)
     return (_s1[mod] or "") .. base
 end
 
--- Format number untuk display (guna log10, works semua range)
 local function formatNum(n)
     if not n or n <= 0 then return "0" end
     if n < 1e3 then return tostring(math.floor(n)) end
@@ -98,14 +95,9 @@ local function getAura()
     return player:GetAttribute("Aura") or 0
 end
 
--- Dapat aura sebagai (group, mantissa) untuk comparison rebirth target yang accurate
--- PENTING: Aura_Exponent dalam game adalah INTEGER (e.g. 48 untuk range QDc),
--- jadi mantissa MESTI diambil dari raw Aura attribute, bukan dikira dari exponent.
 local function getAuraTier()
     local aura = player:GetAttribute("Aura") or 0
     local exp  = player:GetAttribute("Aura_Exponent")
-
-    -- Tentukan group
     local grp
     if type(exp) == "number" and exp >= 0 then
         grp = math.floor(exp / 3)
@@ -113,18 +105,14 @@ local function getAuraTier()
         if aura <= 0 then return 0, 0 end
         grp = math.floor(math.log10(aura) / 3)
     end
-
-    -- Mantissa sentiasa dari raw Aura (Aura_Exponent adalah integer, tak boleh pakai untuk mantissa)
     local mantissa
     if aura > 0 then
         mantissa = aura / (10 ^ (grp * 3))
     elseif type(exp) == "number" then
-        -- Aura overflow (>1e308): fallback estimate dari exponent
         mantissa = 10 ^ (exp - grp * 3)
     else
         mantissa = 0
     end
-
     return grp, mantissa
 end
 
@@ -144,10 +132,15 @@ local forceHop              = false
 local kothHopping           = false
 local autoKothRebirth       = false
 local autoNotifRebirth      = false
-local kothRebirthGroup      = 16     -- group 16 = QDc = 1e48 (current game range)
-local kothRebirthUnit       = "QDc"  -- label untuk display
-local kothRebirthVal        = 1      -- mantissa value
+local kothRebirthGroup      = 16
+local kothRebirthUnit       = "QDc"
+local kothRebirthVal        = 1
 local kothRebirthMultiplier = 1
+local kothRebirthCount      = 0       -- FIX: was missing, caused silent crash
+local autoCZTeleport        = false
+local autoCZServerHop       = false
+local autoCZGuard           = false  -- NEW: CZ Guard
+local czInsideZone          = false
 
 -- ============================================================
 -- CONSTANTS
@@ -170,6 +163,7 @@ local GREEN  = Color3.fromRGB(80, 200, 120)
 local RED    = Color3.fromRGB(220, 80, 80)
 local DARK   = Color3.fromRGB(10, 10, 14)
 local PANEL  = Color3.fromRGB(18, 16, 26)
+local CURSE  = Color3.fromRGB(160, 60, 220)
 
 -- ============================================================
 -- SCREENGUI
@@ -187,8 +181,7 @@ if not ok then ScreenGui.Parent = player.PlayerGui end
 -- ============================================================
 local Main = Instance.new("Frame")
 Main.Size                  = UDim2.new(0, 320, 0, 300)
-Main.Position              = UDim2.new(0.5, 0, 0.5, 0)
-Main.AnchorPoint           = Vector2.new(0.5, 0.5)
+Main.AnchorPoint           = Vector2.new(0.5, 0)
 Main.BackgroundColor3      = DARK
 Main.BackgroundTransparency = 0.3
 Main.BorderSizePixel       = 0
@@ -310,8 +303,10 @@ local function makeTabBtn(icon, posY)
     return btn
 end
 
+-- 3 tabs: KOTH, Cursed Zone, Config
 local TabKOTH   = makeTabBtn("👑", 8)
-local TabConfig = makeTabBtn("💾", 50)
+local TabCZ     = makeTabBtn("💀", 50)
+local TabConfig = makeTabBtn("💾", 92)
 
 local TabIndicator = Instance.new("Frame")
 TabIndicator.Size            = UDim2.new(0, 3, 0, 24)
@@ -343,6 +338,7 @@ end
 
 local PanelConfig = makePanel(); PanelConfig.Visible = false
 local PanelKOTH   = makePanel()
+local PanelCZ     = makePanel(); PanelCZ.Visible = false
 
 -- ============================================================
 -- LAYOUT HELPERS
@@ -764,6 +760,174 @@ do
 end
 
 -- ============================================================
+-- CURSED ZONE PANEL  (single column, no right column)
+-- ============================================================
+local czStatusDot, czRowStatus, czRowTimer, czRowLocation
+local czTpHitbox,  czTpPill,  czTpDot,  czTpStroke
+local czGuardHitbox, czGuardPill, czGuardDot, czGuardStroke
+local czHopHitbox, czHopPill, czHopDot, czHopStroke   -- NEW: server hop toggle
+local czTpStatus
+local czH
+
+do
+    local PAD  = 8
+    local FULL_W = CONTENT_W
+
+    local function makeSec(parent, text, y)
+        local l = Instance.new("TextLabel")
+        l.Size               = UDim2.new(1, -PAD*2, 0, SEC_H)
+        l.Position           = UDim2.new(0, PAD+2, 0, y)
+        l.BackgroundTransparency = 1
+        l.Text               = text
+        l.TextColor3         = WHITE
+        l.TextSize           = 8
+        l.Font               = Enum.Font.GothamBold
+        l.TextXAlignment     = Enum.TextXAlignment.Left
+        l.Parent             = parent
+        return y + SEC_H + GAP
+    end
+
+    local function makeKRow(parent, labelText, isGreen, y)
+        local bg = Instance.new("Frame")
+        bg.Size                 = UDim2.new(1, -PAD*2, 0, 17)
+        bg.Position             = UDim2.new(0, PAD, 0, y)
+        bg.BackgroundTransparency = 1
+        bg.Parent               = parent
+        local lbl = Instance.new("TextLabel")
+        lbl.Size             = UDim2.new(0.45, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text             = labelText
+        lbl.TextColor3       = isGreen and Color3.fromRGB(140,220,140) or Color3.fromRGB(150,140,180)
+        lbl.TextSize         = 9
+        lbl.Font             = Enum.Font.GothamBold
+        lbl.TextXAlignment   = Enum.TextXAlignment.Left
+        lbl.Parent           = bg
+        local val = Instance.new("TextLabel")
+        val.Size             = UDim2.new(0.55, 0, 1, 0)
+        val.Position         = UDim2.new(0.45, 0, 0, 0)
+        val.BackgroundTransparency = 1
+        val.Text             = "—"
+        val.TextColor3       = WHITE
+        val.TextSize         = 9
+        val.Font             = Enum.Font.Gotham
+        val.TextXAlignment   = Enum.TextXAlignment.Right
+        val.Parent           = bg
+        return val, y + 17 + GAP
+    end
+
+    local function makeHDiv(parent, y)
+        local d = Instance.new("Frame")
+        d.Size            = UDim2.new(1, -PAD*2, 0, 1)
+        d.Position        = UDim2.new(0, PAD, 0, y)
+        d.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+        d.BorderSizePixel = 0
+        d.Parent          = parent
+        return y + 1 + GAP
+    end
+
+    local function makeToggleFull(parent, labelText, y)
+        local Btn = Instance.new("Frame")
+        Btn.Size            = UDim2.new(1, -PAD*2, 0, ROW_H)
+        Btn.Position        = UDim2.new(0, PAD, 0, y)
+        Btn.BackgroundColor3 = PANEL
+        Btn.BorderSizePixel = 0
+        Btn.Parent          = parent
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        local Stroke = Instance.new("UIStroke", Btn)
+        Stroke.Color     = OFF_STROKE
+        Stroke.Thickness = 1
+        local Label = Instance.new("TextLabel")
+        Label.Size               = UDim2.new(1, -38, 1, 0)
+        Label.Position           = UDim2.new(0, 8, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text               = labelText
+        Label.TextColor3         = WHITE
+        Label.TextSize           = 9
+        Label.Font               = Enum.Font.GothamBold
+        Label.TextXAlignment     = Enum.TextXAlignment.Left
+        Label.Parent             = Btn
+        local Pill = Instance.new("Frame")
+        Pill.Size            = UDim2.new(0, 28, 0, 14)
+        Pill.Position        = UDim2.new(1, -34, 0.5, -7)
+        Pill.BackgroundColor3 = OFF_PILL
+        Pill.BorderSizePixel = 0
+        Pill.Parent          = Btn
+        Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
+        local Dot = Instance.new("Frame")
+        Dot.Size            = UDim2.new(0, 10, 0, 10)
+        Dot.Position        = UDim2.new(0, 2, 0.5, -5)
+        Dot.BackgroundColor3 = OFF_DOT
+        Dot.BorderSizePixel = 0
+        Dot.Parent          = Pill
+        Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+        local Hitbox = Instance.new("TextButton")
+        Hitbox.Size                 = UDim2.new(1, 0, 1, 0)
+        Hitbox.BackgroundTransparency = 1
+        Hitbox.Text                 = ""
+        Hitbox.Parent               = Btn
+        return Hitbox, Pill, Dot, Stroke, y + ROW_H + GAP
+    end
+
+    -- ---- BUILD PANEL ----
+    local y = GAP
+
+    czStatusDot = Instance.new("Frame")
+    czStatusDot.Size            = UDim2.new(0, 8, 0, 8)
+    czStatusDot.Position        = UDim2.new(0, PAD, 0, y+2)
+    czStatusDot.BackgroundColor3 = OFF_DOT
+    czStatusDot.BorderSizePixel = 0
+    czStatusDot.Parent          = PanelCZ
+    Instance.new("UICorner", czStatusDot).CornerRadius = UDim.new(1, 0)
+
+    local czSecLbl = Instance.new("TextLabel")
+    czSecLbl.Size               = UDim2.new(1, -PAD*2-10, 0, SEC_H)
+    czSecLbl.Position           = UDim2.new(0, PAD+12, 0, y)
+    czSecLbl.BackgroundTransparency = 1
+    czSecLbl.Text               = "CURSED ZONE"
+    czSecLbl.TextColor3         = WHITE
+    czSecLbl.TextSize           = 8
+    czSecLbl.Font               = Enum.Font.GothamBold
+    czSecLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    czSecLbl.Parent             = PanelCZ
+    y = y + SEC_H + GAP
+
+    czRowStatus,   y = makeKRow(PanelCZ, "Status:",   false, y)
+    czRowTimer,    y = makeKRow(PanelCZ, "Timer:",    true,  y)
+
+    y = makeHDiv(PanelCZ, y)
+    czRowLocation, y = makeKRow(PanelCZ, "Location:", false, y)
+
+    y = makeHDiv(PanelCZ, y)
+    y = makeSec(PanelCZ, "AUTO TELEPORT", y)
+
+    czTpHitbox, czTpPill, czTpDot, czTpStroke, y = makeToggleFull(PanelCZ, "Auto TP ke Cursed Zone", y)
+
+    -- NEW: Auto Server Hop toggle row
+    y = makeHDiv(PanelCZ, y)
+    y = makeSec(PanelCZ, "AUTO SERVER HOP", y)
+    czHopHitbox, czHopPill, czHopDot, czHopStroke, y = makeToggleFull(PanelCZ, "Auto Server Hop CZ", y)
+
+    -- NEW: CZ Guard toggle
+    y = makeHDiv(PanelCZ, y)
+    y = makeSec(PanelCZ, "CURSED ZONE GUARD", y)
+    czGuardHitbox, czGuardPill, czGuardDot, czGuardStroke, y = makeToggleFull(PanelCZ, "Auto Re-enter CZ", y)
+
+    czTpStatus = Instance.new("TextLabel")
+    czTpStatus.Size               = UDim2.new(1, -PAD*2, 0, STAT_H)
+    czTpStatus.Position           = UDim2.new(0, PAD, 0, y)
+    czTpStatus.BackgroundTransparency = 1
+    czTpStatus.Text               = "💤 Waiting zone..."
+    czTpStatus.TextColor3         = DIM
+    czTpStatus.TextSize           = 9
+    czTpStatus.Font               = Enum.Font.Gotham
+    czTpStatus.TextXAlignment     = Enum.TextXAlignment.Left
+    czTpStatus.Parent             = PanelCZ
+    y = y + STAT_H + GAP
+
+    czH = y + GAP
+end
+
+-- ============================================================
 -- CONFIG PANEL
 -- ============================================================
 local configNameBox, btnSave, configList, configListLayout
@@ -845,8 +1009,9 @@ do
     configStatus.Parent             = L
     yL = yL + 12 + GAP
 
+    -- RIGHT
     local yR = GAP
-    yR = makeLbl(R, "Saved configs:", yR, DIM, 8, RIGHT_W)
+    yR = makeLbl(R, "Saved configs:", yR, DIM, 8)
 
     configList = Instance.new("ScrollingFrame")
     configList.Size                  = UDim2.new(0, RIGHT_W-PAD*2, 0, 120)
@@ -909,14 +1074,29 @@ do
     yR = yR + 22 + GAP
 
     configH = math.max(yL, yR) + GAP
+
+    function makeLbl(parent, text, y, color, size, w)
+        w = w or LEFT_W
+        local l = Instance.new("TextLabel")
+        l.Size               = UDim2.new(0, w-PAD*2, 0, 12)
+        l.Position           = UDim2.new(0, PAD, 0, y)
+        l.BackgroundTransparency = 1
+        l.Text               = text
+        l.TextColor3         = color or WHITE
+        l.TextSize           = size or 9
+        l.Font               = Enum.Font.GothamBold
+        l.TextXAlignment     = Enum.TextXAlignment.Left
+        l.Parent             = parent
+        return y + 12 + GAP
+    end
 end
 
 -- ============================================================
 -- RESIZE MAIN
 -- ============================================================
-local fullH = PAD_TOP + math.max(kothH, configH) + GAP
+local fullH = PAD_TOP + math.max(kothH, czH, configH) + GAP
 Main.Size     = UDim2.new(0, 320, 0, fullH)
-Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.Position = UDim2.new(0.5, 0, 0.5, -math.floor(fullH / 2))
 
 -- ============================================================
 -- KOTH LOGIC
@@ -982,30 +1162,151 @@ local function updateKOTHPanel()
 end
 
 -- ============================================================
+-- CURSED ZONE LOGIC
+-- ============================================================
+
+-- Returns: isSpawned (bool), timerText (string), position (Vector3 or nil)
+local function getCZInfo()
+    local czFolder = workspace:FindFirstChild("ActiveCursedZone")
+    if czFolder then
+        local hitbox = czFolder:FindFirstChild("AreaHitbox") or czFolder:FindFirstChild("Hitbox")
+        local pos = hitbox and hitbox.Position or nil
+
+        -- Kira radius dari actual hitbox size
+        local czRadius = 50 -- fallback default
+        if hitbox then
+            pcall(function()
+                local s = hitbox.Size
+                czRadius = math.max(s.X, s.Z) / 2
+            end)
+        end
+
+        local timerText = "Active"
+        pcall(function()
+            local czt = player.PlayerGui:FindFirstChild("Hud")
+                and player.PlayerGui.Hud:FindFirstChild("CursedZoneTimer")
+            if czt then
+                local m = czt.Text:match("(%d+:%d+)$")
+                if m then timerText = m end
+            end
+        end)
+
+        return true, timerText, pos, czRadius
+    end
+
+    local spawnCountdown = nil
+    pcall(function()
+        local czt = player.PlayerGui:FindFirstChild("Hud")
+            and player.PlayerGui.Hud:FindFirstChild("CursedZoneTimer")
+        if czt then
+            local rawText = czt.Text or ""
+            local m = rawText:match("(%d+:%d+)$")
+            if m and rawText:lower():find("spawn") then
+                spawnCountdown = m
+            end
+        end
+    end)
+
+    return false, spawnCountdown, nil
+end
+
+-- NEW: Parse "MM:SS" atau "SS" → total seconds, nil kalau fail
+local function parseCZTimer(timerText)
+    if not timerText then return nil end
+    local m, s = timerText:match("^(%d+):(%d+)$")
+    if m and s then
+        return tonumber(m) * 60 + tonumber(s)
+    end
+    local ss = timerText:match("^(%d+)$")
+    if ss then return tonumber(ss) end
+    return nil
+end
+
+local czTeleportDebounce = false
+
+local function updateCZPanel()
+    local spawned, timerText, czPos = getCZInfo()
+
+    if spawned then
+        czStatusDot.BackgroundColor3 = CURSE
+        czRowStatus.Text      = "Spawned 💀"
+        czRowStatus.TextColor3 = CURSE
+
+        czRowTimer.Text       = timerText or "Active"
+        czRowTimer.TextColor3 = WARN
+
+        if czPos then
+            czRowLocation.Text = string.format("%.0f, %.0f, %.0f", czPos.X, czPos.Y, czPos.Z)
+            czRowLocation.TextColor3 = Color3.fromRGB(180, 180, 255)
+        else
+            czRowLocation.Text = "No hitbox"
+            czRowLocation.TextColor3 = DIM
+        end
+
+        if autoCZTeleport and czPos and not czTeleportDebounce then
+            czTeleportDebounce = true
+            teleport(czPos + Vector3.new(0, 5, 0))
+            czTpStatus.Text      = "✅ Teleported!"
+            czTpStatus.TextColor3 = GREEN
+        end
+    else
+        czTeleportDebounce = false
+
+        czStatusDot.BackgroundColor3 = RED
+        czRowStatus.Text      = "Despawned 🔴"
+        czRowStatus.TextColor3 = RED
+
+        if timerText then
+            czRowTimer.Text      = timerText .. " (spawn)"
+            czRowTimer.TextColor3 = Color3.fromRGB(150, 150, 255)
+        else
+            czRowTimer.Text      = "Waiting..."
+            czRowTimer.TextColor3 = DIM
+        end
+
+        czRowLocation.Text = "—"
+        czRowLocation.TextColor3 = DIM
+
+        if autoCZTeleport and not autoCZServerHop then
+            czTpStatus.Text      = "⏳ Tunggu zone spawn..."
+            czTpStatus.TextColor3 = WARN
+        elseif not autoCZTeleport and not autoCZServerHop then
+            czTpStatus.Text      = "💤 Waiting zone..."
+            czTpStatus.TextColor3 = DIM
+        end
+    end
+end
+
+-- ============================================================
 -- TAB SWITCH
 -- ============================================================
 local activeTab = "koth"
 local function switchTab(tab)
-    activeTab       = tab
+    activeTab           = tab
     PanelConfig.Visible = (tab == "config")
     PanelKOTH.Visible   = (tab == "koth")
+    PanelCZ.Visible     = (tab == "cz")
     TabConfig.TextColor3 = tab == "config" and WHITE or DIM
     TabKOTH.TextColor3   = tab == "koth"   and WHITE or DIM
+    TabCZ.TextColor3     = tab == "cz"     and WHITE or DIM
     TweenService:Create(TabConfig,    tweenInfo, {BackgroundTransparency = tab=="config" and 0.6 or 1}):Play()
     TweenService:Create(TabKOTH,      tweenInfo, {BackgroundTransparency = tab=="koth"   and 0.6 or 1}):Play()
-    TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0, tab=="koth" and 13 or 55)}):Play()
+    TweenService:Create(TabCZ,        tweenInfo, {BackgroundTransparency = tab=="cz"     and 0.6 or 1}):Play()
+    local indY = tab=="koth" and 13 or tab=="cz" and 55 or 97
+    TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0, indY)}):Play()
     if tab == "koth" then updateKOTHPanel() end
+    if tab == "cz"   then updateCZPanel()   end
 end
+
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
 TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
+TabCZ.MouseButton1Click:Connect(function()     switchTab("cz")     end)
 switchTab("koth")
 
 -- ============================================================
--- UNIT PICKER POPUP — ScrollingFrame, support 598 suffix units
+-- UNIT PICKER POPUP
 -- ============================================================
-
--- Build unit list dari game's own suffix algorithm (group 4=T hingga 601=Sxc)
-local kRebUnitList = {}   -- {group_number, "label"}
+local kRebUnitList = {}
 for g = 4, 601 do
     local lbl = getSuffix(g)
     if lbl:sub(1,1) ~= "e" then
@@ -1020,9 +1321,6 @@ local function findUnitIdx(label)
     return 1
 end
 
--- normalizeTarget: kerja dalam group space, bukan float
--- Input: rawVal (number), rawUnit (suffix string)
--- Output: val, label, group
 local function normalizeTarget(rawVal, rawUnit)
     local baseGroup = 4
     for _, u in ipairs(kRebUnitList) do
@@ -1042,7 +1340,6 @@ local function normalizeTarget(rawVal, rawUnit)
     return val, getSuffix(grp), grp
 end
 
--- Config file helpers
 local CONFIG_FILE     = "autohub_config.json"
 local AUTOLOAD_KEY    = "__autoload__"
 local LAST_TARGET_KEY = "__lasttarget__"
@@ -1090,7 +1387,6 @@ local function updateKRebTarget()
     saveRebirthTarget()
 end
 
--- Popup UI
 local UPOP_W        = 160
 local UPOP_ITEM_H   = 22
 local UPOP_VISIBLE  = 8
@@ -1139,7 +1435,6 @@ UPopDiv.BorderSizePixel = 0
 UPopDiv.ZIndex          = 12
 UPopDiv.Parent          = UPopup
 
--- ScrollingFrame untuk list (support ratusan items)
 local UScrollList = Instance.new("ScrollingFrame")
 UScrollList.Size                  = UDim2.new(1, -8, 0, UPOP_LIST_H)
 UScrollList.Position              = UDim2.new(0, 4, 0, 34)
@@ -1256,7 +1551,6 @@ end
 local function openUnitPopup()
     uSelectedIdx = findUnitIdx(kothRebirthUnit)
     refreshUPopItems()
-    -- Auto-scroll ke current unit
     if uSelectedIdx then
         local targetY = (uSelectedIdx - 1) * (UPOP_ITEM_H + 2)
         local center  = math.floor(UPOP_LIST_H / 2)
@@ -1316,6 +1610,51 @@ kRebMultDec.MouseButton1Click:Connect(function() changeMultiplier(-0.1) end)
 kRebMultInc.MouseButton1Click:Connect(function() changeMultiplier( 0.1) end)
 
 -- ============================================================
+-- CURSED ZONE TOGGLE HANDLERS
+-- ============================================================
+czTpHitbox.MouseButton1Click:Connect(function()
+    autoCZTeleport = not autoCZTeleport
+    setToggle(czTpPill, czTpDot, czTpStroke, autoCZTeleport)
+    if autoCZTeleport then
+        czTpStatus.Text      = "⏳ Tunggu zone spawn..."
+        czTpStatus.TextColor3 = WARN
+    else
+        czTeleportDebounce   = false
+        czTpStatus.Text      = "💤 Waiting zone..."
+        czTpStatus.TextColor3 = DIM
+    end
+end)
+
+-- NEW: Auto Server Hop CZ toggle handler
+czHopHitbox.MouseButton1Click:Connect(function()
+    autoCZServerHop = not autoCZServerHop
+    setToggle(czHopPill, czHopDot, czHopStroke, autoCZServerHop)
+    if autoCZServerHop then
+        czTpStatus.Text      = "🔍 Monitoring zone..."
+        czTpStatus.TextColor3 = Color3.fromRGB(150, 220, 255)
+    else
+        czInsideZone = false
+        if not autoCZTeleport then
+            czTpStatus.Text      = "💤 Waiting zone..."
+            czTpStatus.TextColor3 = DIM
+        end
+    end
+end)
+
+-- NEW: CZ Guard toggle handler
+czGuardHitbox.MouseButton1Click:Connect(function()
+    autoCZGuard = not autoCZGuard
+    setToggle(czGuardPill, czGuardDot, czGuardStroke, autoCZGuard)
+    if autoCZGuard then
+        czTpStatus.Text      = "🛡 Guard active..."
+        czTpStatus.TextColor3 = GREEN
+    else
+        czTpStatus.Text      = "💤 Waiting zone..."
+        czTpStatus.TextColor3 = DIM
+    end
+end)
+
+-- ============================================================
 -- CONFIG SYSTEM
 -- ============================================================
 local function setConfigStatus(msg, isErr)
@@ -1332,6 +1671,9 @@ local function getCurrentSettings()
         autoServerHop         = autoServerHop,
         autoKothRebirth       = autoKothRebirth,
         autoNotifRebirth      = autoNotifRebirth,
+        autoCZTeleport        = autoCZTeleport,
+        autoCZServerHop       = autoCZServerHop,
+        autoCZGuard           = autoCZGuard,
         kothRebirthMultiplier = kothRebirthMultiplier,
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
@@ -1360,6 +1702,21 @@ local function applySettings(s)
     if s.autoNotifRebirth ~= nil then
         autoNotifRebirth = s.autoNotifRebirth
         setToggle(kNotifRebPill, kNotifRebDot, kNotifRebStroke, autoNotifRebirth)
+    end
+    if s.autoCZTeleport ~= nil then
+        autoCZTeleport = s.autoCZTeleport
+        setToggle(czTpPill, czTpDot, czTpStroke, autoCZTeleport)
+        czTpStatus.Text      = autoCZTeleport and "⏳ Tunggu zone spawn..." or "💤 Waiting zone..."
+        czTpStatus.TextColor3 = autoCZTeleport and WARN or DIM
+    end
+    -- NEW: restore server hop toggle
+    if s.autoCZServerHop ~= nil then
+        autoCZServerHop = s.autoCZServerHop
+        setToggle(czHopPill, czHopDot, czHopStroke, autoCZServerHop)
+    end
+    if s.autoCZGuard ~= nil then
+        autoCZGuard = s.autoCZGuard
+        setToggle(czGuardPill, czGuardDot, czGuardStroke, autoCZGuard)
     end
     if s.kothRebirthMultiplier ~= nil then
         kothRebirthMultiplier = s.kothRebirthMultiplier
@@ -1418,271 +1775,17 @@ local function rebuildConfigList()
         empty.TextColor3         = DIM
         empty.TextSize           = 9
         empty.Font               = Enum.Font.Gotham
-        empty.TextXAlignment     = Enum.TextXAlignment.Left
         empty.Parent             = configList
     end
 end
 
 -- ============================================================
--- SERVER HOP
--- ============================================================
-local lastHopTime   = 0
-local hopCount      = 0
-local isTeleporting = false  -- guard: block OnTeleport dari trigger double teleport
-
--- HTTP helper yang compatible dengan Delta
--- Delta perlukan Headers yang explicit, kalau tak dia freeze/crash
-local function safeHttpGet(url)
-    -- Cuba request() dengan headers dulu (cara paling stable untuk Delta)
-    if typeof(request) == "function" then
-        local ok, res = pcall(function()
-            return request({
-                Url     = url,
-                Method  = "GET",
-                Headers = {
-                    ["Accept"]     = "application/json",
-                    ["User-Agent"] = "Roblox/WinInet"
-                }
-            })
-        end)
-        if ok and res and res.Body and res.Body ~= "" then
-            return res.Body
-        end
-    end
-    -- Fallback: syn.request / http.request (executor lain)
-    if typeof(syn) == "table" and typeof(syn.request) == "function" then
-        local ok, res = pcall(function()
-            return syn.request({ Url = url, Method = "GET" })
-        end)
-        if ok and res and res.Body then return res.Body end
-    end
-    -- Last resort: HttpGet (elak guna pada Delta tapi backup untuk executor lain)
-    local ok, res = pcall(function() return game:HttpGet(url) end)
-    if ok and res then return res end
-    return nil
-end
-
-local function hopToLeastPopulated(reason)
-    if kothHopping then return end
-    local cooldown = math.min(12 + (hopCount * 2), 25)
-    if tick() - lastHopTime < cooldown then
-        local remaining = math.ceil(cooldown - (tick() - lastHopTime))
-        kAutoStatus.Text       = "⏳ Hop cooldown " .. remaining .. "s..."
-        kAutoStatus.TextColor3 = DIM
-        return
-    end
-    lastHopTime = tick()
-    hopCount   += 1
-    kothHopping = true
-    kAutoStatus.Text      = "🔄 Scanning... (" .. (reason or "?") .. ")"
-    kAutoStatus.TextColor3 = WARN
-
-    task.spawn(function()
-        local currentJobId = game.JobId
-        local bestServer, soloServer = nil, nil
-        local bestCount    = math.huge
-        local allServers   = {}
-        local cursor       = ""
-        local totalScanned = 0
-
-        local maxPages = math.random(2, 5)
-        for page = 1, maxPages do
-            kAutoStatus.Text = string.format("🔍 Scanning page %d/%d...", page, maxPages)
-
-            local url = string.format(
-                "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
-                placeId
-            )
-            if cursor ~= "" then url = url .. "&cursor=" .. cursor end
-
-            -- FIX: Guna safeHttpGet yang ada proper headers untuk Delta
-            local result = safeHttpGet(url)
-            if not result then
-                kAutoStatus.Text      = "⚠ HTTP error pg " .. page
-                kAutoStatus.TextColor3 = WARN
-                task.wait(1)
-                break
-            end
-
-            local ok2, data = pcall(function() return HttpService:JSONDecode(result) end)
-            if not ok2 or not data or not data.data then break end
-
-            for _, server in ipairs(data.data) do
-                if server.id ~= currentJobId and server.playing and server.playing >= 1 then
-                    totalScanned += 1
-                    table.insert(allServers, server)
-                    if server.playing == 1 and not soloServer then
-                        soloServer = server
-                    end
-                    if server.playing < bestCount then
-                        bestCount  = server.playing
-                        bestServer = server
-                    end
-                end
-            end
-
-            if soloServer then
-                kAutoStatus.Text = "✅ Solo server found!"; break
-            end
-
-            if data.nextPageCursor and data.nextPageCursor ~= "" then
-                cursor = data.nextPageCursor; task.wait(0.3)
-            else
-                break
-            end
-        end
-
-        local target = soloServer or bestServer
-        if not target and #allServers > 0 then
-            target = allServers[math.random(1, #allServers)]
-            kAutoStatus.Text = "🎲 Random fallback server"
-        end
-
-        if target then
-            kAutoStatus.Text = string.format(
-                "🚀 Hopping -> %d player(s) [scanned %d]",
-                target.playing, totalScanned
-            )
-            task.wait(1.5 + math.random() * 2)
-
-            -- FIX: Set guard sebelum teleport supaya OnTeleport tak double fire
-            isTeleporting = true
-
-            -- Cuba semua method teleport dari paling specific ke paling basic
-            local hopOk = pcall(function()
-                TeleportService:TeleportToPlaceInstance(placeId, target.id, player)
-            end)
-            if not hopOk then
-                hopOk = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(placeId, target.id)
-                end)
-            end
-            if not hopOk then
-                hopOk = pcall(function()
-                    TeleportService:Teleport(placeId)
-                end)
-            end
-
-            if not hopOk then
-                isTeleporting = false
-                kAutoStatus.Text      = "❌ Teleport failed — retry in 10s"
-                kAutoStatus.TextColor3 = RED
-                task.wait(10)
-                kothHopping = false
-            end
-        else
-            kAutoStatus.Text      = string.format("❌ No server found (%d scanned)", totalScanned)
-            kAutoStatus.TextColor3 = RED
-            task.wait(3)
-            kothHopping = false
-        end
-    end)
-end
-
--- ============================================================
--- AUTO KOTH LOOP
--- ============================================================
-task.spawn(function()
-    local wasHolding = false
-
-    local function getKOTHPos()
-        local ok, hitbox = pcall(function()
-            return workspace:WaitForChild("KOTH", 5):WaitForChild("AreaHitbox", 5)
-        end)
-        if ok and hitbox then return hitbox.Position + Vector3.new(0, 3, 0) end
-        return nil
-    end
-
-    while ScreenGui.Parent do
-        if forceHop then
-            forceHop = false
-            hopToLeastPopulated("Force")
-            task.wait(5)
-        end
-
-        if autoKOTH and not kothHopping then
-            local myAura               = getAura()
-            local claimed, _, kingAura = getKOTHStatus()
-            local inKOTH               = isInKOTH()
-
-            if inKOTH then
-                if claimed and kingAura > myAura then
-                    wasHolding = false
-                    if autoServerHop then
-                        kAutoStatus.Text       = "⚠️ Threat! Hopping..."
-                        kAutoStatus.TextColor3 = RED
-                        hopToLeastPopulated("Threat")
-                    else
-                        kAutoStatus.Text       = "⚠️ Threat! Staying..."
-                        kAutoStatus.TextColor3 = WARN
-                    end
-                else
-                    wasHolding             = true
-                    kAutoStatus.Text       = "👑 Holding KOTH!"
-                    kAutoStatus.TextColor3 = WHITE
-                end
-            else
-                local KOTH_POS = getKOTHPos()
-                if wasHolding then
-                    if claimed and kingAura > myAura then
-                        wasHolding = false
-                        if autoServerHop then
-                            kAutoStatus.Text       = "💀 Killed! Hopping..."
-                            kAutoStatus.TextColor3 = RED
-                            hopToLeastPopulated("Killed")
-                            task.wait(5)
-                        else
-                            kAutoStatus.Text       = "💀 Killed! Checking..."
-                            kAutoStatus.TextColor3 = WARN
-                            task.wait(2)
-                            local claimed2, _, kingAura2 = getKOTHStatus()
-                            local myAura2             = getAura()
-                            if not claimed2 or myAura2 > kingAura2 then
-                                kAutoStatus.Text       = "🔁 Re-entering..."
-                                kAutoStatus.TextColor3 = WARN
-                                if KOTH_POS then teleport(KOTH_POS) end
-                            else
-                                kAutoStatus.Text       = "💪 King strong — waiting"
-                                kAutoStatus.TextColor3 = RED
-                            end
-                        end
-                    else
-                        wasHolding             = false
-                        kAutoStatus.Text       = "🔁 Re-entering..."
-                        kAutoStatus.TextColor3 = WARN
-                        if KOTH_POS then teleport(KOTH_POS) end
-                    end
-                elseif not claimed then
-                    kAutoStatus.Text       = "🟢 Empty — entering!"
-                    kAutoStatus.TextColor3 = GREEN
-                    if KOTH_POS then teleport(KOTH_POS) end
-                elseif myAura > kingAura then
-                    kAutoStatus.Text       = "⚡ King weak — entering!"
-                    kAutoStatus.TextColor3 = WARN
-                    if KOTH_POS then teleport(KOTH_POS) end
-                else
-                    if autoServerHop then
-                        kAutoStatus.Text       = "💪 King strong — hopping!"
-                        kAutoStatus.TextColor3 = RED
-                        hopToLeastPopulated("Strong King")
-                    else
-                        kAutoStatus.Text       = "💪 King strong — waiting"
-                        kAutoStatus.TextColor3 = RED
-                    end
-                end
-            end
-        end
-        task.wait(3)
-    end
-end)
-
--- ============================================================
--- TOGGLE EVENTS
+-- KOTH TOGGLE HANDLERS
 -- ============================================================
 kAutoHitbox.MouseButton1Click:Connect(function()
     autoKOTH = not autoKOTH
     setToggle(kAutoPill, kAutoDot, kAutoStroke, autoKOTH)
-    kAutoStatus.Text       = autoKOTH and "🔄 Running..." or "💤 Idle"
+    kAutoStatus.Text      = autoKOTH and "🔄 Running..." or "💤 Idle"
     kAutoStatus.TextColor3 = autoKOTH and GREEN or DIM
 end)
 
@@ -1692,43 +1795,19 @@ kHopHitbox.MouseButton1Click:Connect(function()
 end)
 
 kHopBtn.MouseButton1Click:Connect(function()
-    -- DEBUG: Test satu-satu untuk cari punca crash
-    kAutoStatus.Text = "DEBUG: Button pressed"
-    kAutoStatus.TextColor3 = WARN
-    task.wait(0.5)
-    
-    -- Test 1: Adakah task.spawn je yang crash?
-    kAutoStatus.Text = "DEBUG: Testing task.spawn..."
-    task.spawn(function()
-        kAutoStatus.Text = "DEBUG: Inside task.spawn OK"
-        task.wait(0.5)
-        
-        -- Test 2: Adakah HTTP request yang crash?
-        kAutoStatus.Text = "DEBUG: Testing HTTP..."
-        local ok, result = pcall(function()
-            return request({
-                Url = "https://games.roblox.com/v1/games/" .. tostring(placeId) .. "/servers/Public?limit=10",
-                Method = "GET",
-                Headers = { ["Accept"] = "application/json" }
-            })
-        end)
-        
-        if not ok then
-            kAutoStatus.Text = "DEBUG: HTTP FAILED - " .. tostring(result)
-            kAutoStatus.TextColor3 = RED
-            return
-        end
-        
-        kAutoStatus.Text = "DEBUG: HTTP OK, testing teleport..."
-        task.wait(1)
-        
-        -- Test 3: Adakah TeleportService yang crash?
-        kAutoStatus.Text = "DEBUG: Testing TeleportService..."
-        local tok = pcall(function()
-            TeleportService:TeleportToPlaceInstance(placeId, game.JobId)
-        end)
-        kAutoStatus.Text = "DEBUG: Teleport pcall = " .. tostring(tok)
-    end)
+    forceHop = true
+end)
+
+kRebHitbox.MouseButton1Click:Connect(function()
+    autoKothRebirth = not autoKothRebirth
+    setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
+    kRebStatus.Text      = autoKothRebirth and "ON" or "OFF"
+    kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
+end)
+
+kNotifRebHitbox.MouseButton1Click:Connect(function()
+    autoNotifRebirth = not autoNotifRebirth
+    setToggle(kNotifRebPill, kNotifRebDot, kNotifRebStroke, autoNotifRebirth)
 end)
 
 kInstantRebBtn.MouseButton1Click:Connect(function()
@@ -1737,22 +1816,8 @@ kInstantRebBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-kNotifRebHitbox.MouseButton1Click:Connect(function()
-    autoNotifRebirth = not autoNotifRebirth
-    setToggle(kNotifRebPill, kNotifRebDot, kNotifRebStroke, autoNotifRebirth)
-end)
-
-local kothRebirthCount = 0
-kRebHitbox.MouseButton1Click:Connect(function()
-    autoKothRebirth = not autoKothRebirth
-    setToggle(kRebPill, kRebDot, kRebStroke, autoKothRebirth)
-    kRebStatus.Text       = autoKothRebirth and "ON" or "OFF"
-    kRebStatus.TextColor3 = autoKothRebirth and GREEN or RED
-    updateKRebTarget()
-end)
-
 -- ============================================================
--- CONFIG BUTTONS
+-- CONFIG BUTTON HANDLERS
 -- ============================================================
 btnSave.MouseButton1Click:Connect(function()
     if not hasFS then setConfigStatus("⚠ Executor tak support!", true); return end
@@ -1813,19 +1878,134 @@ local minimized = false
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,320,0,38)}):Play()
-        ContentArea.Visible = false; TabBar.Visible = false; TabDiv.Visible = false
+        ContentArea.Visible = false; TabBar.Visible = false; TabDiv.Visible = false; TitleDiv.Visible = false
+        TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,320,0,36)}):Play()
     else
         TweenService:Create(Main, tweenInfo, {Size = UDim2.new(0,320,0,fullH)}):Play()
-        ContentArea.Visible = true; TabBar.Visible = true; TabDiv.Visible = true
+        task.delay(tweenInfo.Time, function()
+            ContentArea.Visible = true; TabBar.Visible = true; TabDiv.Visible = true; TitleDiv.Visible = true
+        end)
     end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
     autoKOTH = false; autoKothRebirth = false; autoNotifRebirth = false
+    autoCZTeleport = false; autoCZServerHop = false; autoCZGuard = false
     killEvent:Fire()
     ScreenGui:Destroy()
 end)
+
+-- ============================================================
+-- SERVER HOP (Delta-compatible: HttpGet + TeleportToPlaceInstance)
+-- ============================================================
+local lastHopTime   = 0
+local hopCount      = 0
+local isTeleporting = false
+
+local function doServerHop(reason, statusLabel)
+    local cooldown = math.min(12 + (hopCount * 2), 25)
+    if tick() - lastHopTime < cooldown then
+        local remaining = math.ceil(cooldown - (tick() - lastHopTime))
+        if statusLabel then
+            statusLabel.Text      = "⏳ Cooldown " .. remaining .. "s..."
+            statusLabel.TextColor3 = DIM
+        end
+        return
+    end
+    lastHopTime = tick()
+    hopCount   += 1
+
+    if statusLabel then
+        statusLabel.Text      = "🔍 Scanning servers..."
+        statusLabel.TextColor3 = WARN
+    end
+
+    task.spawn(function()
+        local currentJobId = game.JobId
+        local target       = nil
+        local bestCount    = math.huge
+        local cursor       = ""
+
+        -- Scan 1 page je — cukup untuk cari server lain, tak perlu banyak
+        local url = string.format(
+            "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+            placeId
+        )
+
+        -- game:HttpGet OK pada Delta (request() crash, HttpGet OK)
+        local ok, result = pcall(function()
+            return game:HttpGet(url)
+        end)
+
+        if ok and result then
+            local ok2, data = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(result)
+            end)
+            if ok2 and data and data.data then
+                for _, server in ipairs(data.data) do
+                    if server.id ~= currentJobId
+                    and server.playing
+                    and server.playing >= 1 then
+                        -- Pilih server paling sikit player
+                        if server.playing < bestCount then
+                            bestCount = server.playing
+                            target    = server
+                        end
+                        -- Kalau jumpa solo server terus guna
+                        if server.playing == 1 then break end
+                    end
+                end
+            end
+        end
+
+        if target then
+            if statusLabel then
+                statusLabel.Text      = "🚀 Hopping -> " .. target.playing .. " player(s)"
+                statusLabel.TextColor3 = WARN
+            end
+            task.wait(1 + math.random())
+            isTeleporting = true
+            local hopOk = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, target.id)
+            end)
+            if not hopOk then
+                -- Fallback kalau TeleportToPlaceInstance fail
+                hopOk = pcall(function()
+                    TeleportService:Teleport(placeId)
+                end)
+            end
+            if not hopOk then
+                isTeleporting = false
+                if statusLabel then
+                    statusLabel.Text      = "❌ Teleport failed"
+                    statusLabel.TextColor3 = RED
+                end
+                task.wait(5)
+                kothHopping = false
+            end
+        else
+            -- Tak jumpa server lain — guna Teleport random
+            if statusLabel then
+                statusLabel.Text      = "🎲 No scan result, random hop..."
+                statusLabel.TextColor3 = WARN
+            end
+            task.wait(1)
+            isTeleporting = true
+            local hopOk = pcall(function()
+                TeleportService:Teleport(placeId)
+            end)
+            if not hopOk then
+                isTeleporting = false
+                if statusLabel then
+                    statusLabel.Text      = "❌ Teleport failed"
+                    statusLabel.TextColor3 = RED
+                end
+                task.wait(5)
+                kothHopping = false
+            end
+        end
+    end)
+end
 
 -- ============================================================
 -- POLLING & BACKGROUND LOOPS
@@ -1833,7 +2013,8 @@ end)
 task.spawn(function()
     while ScreenGui.Parent do
         if activeTab == "koth" then updateKOTHPanel() end
-        task.wait(2)
+        if activeTab == "cz"   then updateCZPanel()   end
+        task.wait(1)
     end
 end)
 
@@ -1845,7 +2026,6 @@ task.spawn(function()
     local killed        = false
     killEvent.Event:Connect(function() killed = true end)
 
-    -- Wait for TopBar (max 30s)
     local tbOk = pcall(function()
         topBar = playerGui:WaitForChild("Hud", 30):WaitForChild("TopBar", 30)
     end)
@@ -1854,7 +2034,6 @@ task.spawn(function()
         return
     end
 
-    -- Wait for RequestRebirth remote (max 30s)
     local elapsed = 0
     while not RequestRebirth and elapsed < 30 and not killed do
         task.wait(0.5)
@@ -1886,8 +2065,6 @@ task.spawn(function()
     killEvent.Event:Connect(function() killed = true end)
     while not killed do
         if autoKothRebirth then
-            -- Fix: compare group DAN mantissa — supaya "160 TDc" betul-betul tunggu 160 TDc,
-            -- bukan trigger bila masuk group TDc sahaja (e.g. 1.91 TDc dah >= group TDc)
             local curGrp, curMant = getAuraTier()
             local rebirthReached  = (curGrp > kothRebirthGroup)
                 or (curGrp == kothRebirthGroup and curMant >= kothRebirthVal)
@@ -1912,6 +2089,243 @@ task.spawn(function()
                     updateKRebTarget()
                 end
                 task.wait(1)
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- ============================================================
+-- AUTO KOTH LOOP (Force Hop + Auto Enter + Auto Server Hop)
+-- ============================================================
+task.spawn(function()
+    local killed     = false
+    local wasHolding = false
+    killEvent.Event:Connect(function() killed = true end)
+
+    local function getKOTHPos()
+        local ok, hitbox = pcall(function()
+            return workspace:WaitForChild("KOTH", 5):WaitForChild("AreaHitbox", 5)
+        end)
+        if ok and hitbox then return hitbox.Position + Vector3.new(0, 3, 0) end
+        return nil
+    end
+
+    while not killed and ScreenGui.Parent do
+        -- Force Hop
+        if forceHop then
+            forceHop = false
+            doServerHop("Force", kAutoStatus)
+            task.wait(3)
+
+        elseif autoKOTH and not kothHopping then
+            local myAura               = getAura()
+            local claimed, _, kingAura = getKOTHStatus()
+            local inKOTH               = isInKOTH()
+            local KOTH_POS             = getKOTHPos()
+
+            if inKOTH then
+                -- Player dah dalam KOTH
+                if claimed and kingAura > myAura then
+                    -- Ada king yang lebih kuat — hop keluar
+                    wasHolding = false
+                    if autoServerHop then
+                        kAutoStatus.Text      = "⚠️ Threat! Hopping..."
+                        kAutoStatus.TextColor3 = RED
+                        doServerHop("Threat", kAutoStatus)
+                    else
+                        kAutoStatus.Text      = "⚠️ Threat! Staying..."
+                        kAutoStatus.TextColor3 = WARN
+                    end
+                else
+                    wasHolding             = true
+                    kAutoStatus.Text       = "👑 Holding KOTH!"
+                    kAutoStatus.TextColor3 = WHITE
+                end
+
+            else
+                -- Player di luar KOTH
+                if wasHolding then
+                    -- Baru keluar dari KOTH
+                    if claimed and kingAura > myAura then
+                        wasHolding = false
+                        if autoServerHop then
+                            kAutoStatus.Text      = "💀 Killed! Hopping..."
+                            kAutoStatus.TextColor3 = RED
+                            doServerHop("Killed", kAutoStatus)
+                            task.wait(5)
+                        else
+                            kAutoStatus.Text      = "💀 Killed! Checking..."
+                            kAutoStatus.TextColor3 = WARN
+                            task.wait(2)
+                            local claimed2, _, kingAura2 = getKOTHStatus()
+                            local myAura2 = getAura()
+                            if not claimed2 or myAura2 > kingAura2 then
+                                kAutoStatus.Text      = "🔁 Re-entering..."
+                                kAutoStatus.TextColor3 = WARN
+                                if KOTH_POS then teleport(KOTH_POS) end
+                            else
+                                kAutoStatus.Text      = "💪 King strong — waiting"
+                                kAutoStatus.TextColor3 = RED
+                            end
+                        end
+                    else
+                        wasHolding             = false
+                        kAutoStatus.Text       = "🔁 Re-entering..."
+                        kAutoStatus.TextColor3 = WARN
+                        if KOTH_POS then teleport(KOTH_POS) end
+                    end
+
+                elseif not claimed then
+                    -- KOTH kosong — masuk terus
+                    kAutoStatus.Text      = "🟢 Empty — entering!"
+                    kAutoStatus.TextColor3 = GREEN
+                    if KOTH_POS then teleport(KOTH_POS) end
+
+                elseif myAura > kingAura then
+                    -- King lemah — masuk dan ambil alih
+                    kAutoStatus.Text      = "⚡ King weak — entering!"
+                    kAutoStatus.TextColor3 = WARN
+                    if KOTH_POS then teleport(KOTH_POS) end
+
+                else
+                    -- King lebih kuat — hop atau tunggu
+                    if autoServerHop then
+                        kAutoStatus.Text      = "💪 King strong — hopping!"
+                        kAutoStatus.TextColor3 = RED
+                        doServerHop("Strong King", kAutoStatus)
+                    else
+                        kAutoStatus.Text      = "💪 King strong — waiting"
+                        kAutoStatus.TextColor3 = RED
+                    end
+                end
+            end
+
+        elseif not autoKOTH then
+            kothHopping = false
+        end
+
+        task.wait(3)
+    end
+end)
+
+-- ============================================================
+-- AUTO SERVER HOP CZ LOOP
+-- ============================================================
+task.spawn(function()
+    local killed = false
+    killEvent.Event:Connect(function() killed = true end)
+
+    local hopScheduled = false
+
+    while not killed and ScreenGui.Parent do
+        if autoCZServerHop then
+            local spawned, timerText, czPos, czRadius = getCZInfo()
+
+            if not spawned then
+                local secs = parseCZTimer(timerText)
+
+                if czInsideZone then
+                    -- Player tadi dah dalam zone, zone baru habis → hop terus
+                    czInsideZone = false
+                    if not hopScheduled then
+                        hopScheduled = true
+                        task.wait(1.5)
+                        if autoCZServerHop then
+                            doServerHop("Zone habis", czTpStatus)
+                        end
+                        hopScheduled = false
+                    end
+
+                elseif secs ~= nil and secs > 20 then
+                    -- Timer lama lagi → hop cari server lain
+                    if not hopScheduled then
+                        hopScheduled = true
+                        czTpStatus.Text       = "🔀 Timer " .. (timerText or "?") .. " — hopping..."
+                        czTpStatus.TextColor3 = WARN
+                        task.wait(1.5)
+                        if autoCZServerHop then
+                            doServerHop((timerText or "?") .. " lagi", czTpStatus)
+                        end
+                        hopScheduled = false
+                    end
+
+                elseif secs ~= nil and secs <= 20 then
+                    -- Nak spawn dalam masa terdekat → standby, reset flag
+                    hopScheduled = false
+                    czTpStatus.Text       = "⏳ Spawn dalam " .. (timerText or "?") .. ", standby..."
+                    czTpStatus.TextColor3 = Color3.fromRGB(150, 220, 255)
+
+                else
+                    hopScheduled = false
+                    czTpStatus.Text       = "🔍 Monitoring zone..."
+                    czTpStatus.TextColor3 = DIM
+                end
+
+            else
+                -- Zone spawned → reset hopScheduled, check proximity player
+                hopScheduled = false
+                if czPos and czRadius then
+                    local c   = player.Character
+                    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+                    if hrp and (hrp.Position - czPos).Magnitude < czRadius then
+                        if not czInsideZone then
+                            czInsideZone = true
+                            czTpStatus.Text       = "✅ Dalam zone!"
+                            czTpStatus.TextColor3 = GREEN
+                        end
+                    end
+                end
+            end
+        else
+            czInsideZone = false
+            hopScheduled = false
+        end
+
+        task.wait(2)
+    end
+end)
+
+-- ============================================================
+-- CZ GUARD LOOP
+-- ============================================================
+task.spawn(function()
+    local killed      = false
+    local guardDebounce = false
+    killEvent.Event:Connect(function() killed = true end)
+
+    while not killed and ScreenGui.Parent do
+        if autoCZGuard then
+            local spawned, _, czPos, czRadius = getCZInfo()
+
+            if spawned and czPos and czRadius then
+                -- Zone aktif — check sama ada player masih dalam zone
+                local c   = player.Character
+                local hrp = c and c:FindFirstChild("HumanoidRootPart")
+
+                if hrp then
+                    local dist = (hrp.Position - czPos).Magnitude
+                    if dist > czRadius then
+                        -- Player terkeluar dari zone — masuk balik
+                        if not guardDebounce then
+                            guardDebounce         = true
+                            czTpStatus.Text      = "🛡 Terkeluar! Re-entering..."
+                            czTpStatus.TextColor3 = RED
+                            teleport(czPos + Vector3.new(0, 5, 0))
+                            task.wait(2)
+                            guardDebounce = false
+                        end
+                    else
+                        czTpStatus.Text      = "🛡 Guard: Dalam zone ✅"
+                        czTpStatus.TextColor3 = GREEN
+                    end
+                end
+            else
+                -- Zone tak spawned — guard standby
+                if autoCZGuard and not autoCZTeleport and not autoCZServerHop then
+                    czTpStatus.Text      = "🛡 Guard: Tunggu zone..."
+                    czTpStatus.TextColor3 = DIM
+                end
             end
         end
         task.wait(0.5)
@@ -1950,8 +2364,7 @@ end)
 -- DISCONNECT / IDLE DETECTION
 -- ============================================================
 player.OnTeleport:Connect(function(state)
-    -- FIX: Kalau kita yang trigger (server hop), ignore event ni
-    -- tanpa guard ni, Delta akan double teleport dan crash
+    -- Guard: kalau kita yang trigger teleport, jangan double fire
     if isTeleporting then return end
     if state == Enum.TeleportState.RequestedFromServer then
         warn("[AutoHub] Server teleport detected")
@@ -1969,4 +2382,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test3 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("Aura Ascension AutoHub v9 loaded. Delta server hop fix applied.")
