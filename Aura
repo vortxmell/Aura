@@ -1426,9 +1426,41 @@ end
 -- ============================================================
 -- SERVER HOP
 -- ============================================================
-local lastHopTime  = 0
-local hopCount     = 0
-local isTeleporting = false  -- FIX: guard supaya OnTeleport tak trigger double teleport
+local lastHopTime   = 0
+local hopCount      = 0
+local isTeleporting = false  -- guard: block OnTeleport dari trigger double teleport
+
+-- HTTP helper yang compatible dengan Delta
+-- Delta perlukan Headers yang explicit, kalau tak dia freeze/crash
+local function safeHttpGet(url)
+    -- Cuba request() dengan headers dulu (cara paling stable untuk Delta)
+    if typeof(request) == "function" then
+        local ok, res = pcall(function()
+            return request({
+                Url     = url,
+                Method  = "GET",
+                Headers = {
+                    ["Accept"]     = "application/json",
+                    ["User-Agent"] = "Roblox/WinInet"
+                }
+            })
+        end)
+        if ok and res and res.Body and res.Body ~= "" then
+            return res.Body
+        end
+    end
+    -- Fallback: syn.request / http.request (executor lain)
+    if typeof(syn) == "table" and typeof(syn.request) == "function" then
+        local ok, res = pcall(function()
+            return syn.request({ Url = url, Method = "GET" })
+        end)
+        if ok and res and res.Body then return res.Body end
+    end
+    -- Last resort: HttpGet (elak guna pada Delta tapi backup untuk executor lain)
+    local ok, res = pcall(function() return game:HttpGet(url) end)
+    if ok and res then return res end
+    return nil
+end
 
 local function hopToLeastPopulated(reason)
     if kothHopping then return end
@@ -1463,14 +1495,13 @@ local function hopToLeastPopulated(reason)
             )
             if cursor ~= "" then url = url .. "&cursor=" .. cursor end
 
-            local ok, result = pcall(function()
-                return (typeof(request) == "function"
-                    and request({Url = url, Method = "GET"}).Body)
-                    or game:HttpGet(url)
-            end)
-            if not ok then
-                kAutoStatus.Text = "⚠ API error pg " .. page
-                task.wait(0.5); break
+            -- FIX: Guna safeHttpGet yang ada proper headers untuk Delta
+            local result = safeHttpGet(url)
+            if not result then
+                kAutoStatus.Text      = "⚠ HTTP error pg " .. page
+                kAutoStatus.TextColor3 = WARN
+                task.wait(1)
+                break
             end
 
             local ok2, data = pcall(function() return HttpService:JSONDecode(result) end)
@@ -1495,7 +1526,7 @@ local function hopToLeastPopulated(reason)
             end
 
             if data.nextPageCursor and data.nextPageCursor ~= "" then
-                cursor = data.nextPageCursor; task.wait(0.2)
+                cursor = data.nextPageCursor; task.wait(0.3)
             else
                 break
             end
@@ -1514,38 +1545,31 @@ local function hopToLeastPopulated(reason)
             )
             task.wait(1.5 + math.random() * 2)
 
-            -- FIX: Set guard dulu sebelum teleport supaya OnTeleport event
-            -- tak trigger double teleport yang crash Delta
+            -- FIX: Set guard sebelum teleport supaya OnTeleport tak double fire
             isTeleporting = true
 
-            -- Cuba TeleportToPlaceInstance dulu
+            -- Cuba semua method teleport dari paling specific ke paling basic
             local hopOk = pcall(function()
                 TeleportService:TeleportToPlaceInstance(placeId, target.id, player)
             end)
-
             if not hopOk then
-                -- Fallback 1: TeleportToPlaceInstance cara lain
                 hopOk = pcall(function()
                     TeleportService:TeleportToPlaceInstance(placeId, target.id)
                 end)
             end
-
             if not hopOk then
-                -- Fallback 2: Teleport biasa (hantar ke server random)
                 hopOk = pcall(function()
                     TeleportService:Teleport(placeId)
                 end)
             end
 
             if not hopOk then
-                -- Semua method fail — reset state
                 isTeleporting = false
                 kAutoStatus.Text      = "❌ Teleport failed — retry in 10s"
                 kAutoStatus.TextColor3 = RED
                 task.wait(10)
                 kothHopping = false
             end
-            -- Kalau berjaya, player akan keluar dari server — state tak perlu reset
         else
             kAutoStatus.Text      = string.format("❌ No server found (%d scanned)", totalScanned)
             kAutoStatus.TextColor3 = RED
@@ -1890,17 +1914,14 @@ end)
 -- DISCONNECT / IDLE DETECTION
 -- ============================================================
 player.OnTeleport:Connect(function(state)
-    -- FIX: Kalau kita yang trigger teleport (server hop), jangan buat apa-apa
-    -- Double teleport dalam Delta akan crash executor terus
+    -- FIX: Kalau kita yang trigger (server hop), ignore event ni
+    -- tanpa guard ni, Delta akan double teleport dan crash
     if isTeleporting then return end
-
     if state == Enum.TeleportState.RequestedFromServer then
         warn("[AutoHub] Server teleport detected")
         task.wait(3)
         isTeleporting = true
-        pcall(function()
-            TeleportService:Teleport(placeId)
-        end)
+        pcall(function() TeleportService:Teleport(placeId) end)
     end
 end)
 
@@ -1912,4 +1933,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test2 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("test3 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
