@@ -338,8 +338,8 @@ local function makePanel()
 end
 
 local PanelConfig = makePanel(); PanelConfig.Visible = false
-local PanelKOTH   = makePanel()
-local PanelCZ     = makePanel(); PanelCZ.Visible = false
+local PanelKOTH   = makePanel(); PanelKOTH.Visible = false
+local PanelCZ     = makePanel()
 
 -- ============================================================
 -- LAYOUT HELPERS
@@ -1351,7 +1351,7 @@ end
 -- ============================================================
 -- TAB SWITCH
 -- ============================================================
-local activeTab = "koth"
+local activeTab = "cz"
 local function switchTab(tab)
     activeTab           = tab
     PanelConfig.Visible = (tab == "config")
@@ -1372,7 +1372,7 @@ end
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
 TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
 TabCZ.MouseButton1Click:Connect(function()     switchTab("cz")     end)
-switchTab("koth")
+switchTab("cz")
 
 -- ============================================================
 -- UNIT PICKER POPUP
