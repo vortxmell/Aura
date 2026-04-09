@@ -1730,8 +1730,6 @@ kHopBtn.MouseButton1Click:Connect(function()
         kAutoStatus.Text = "DEBUG: Teleport pcall = " .. tostring(tok)
     end)
 end)
-    forceHop = true
-end)
 
 kInstantRebBtn.MouseButton1Click:Connect(function()
     if RequestRebirth then
@@ -1971,4 +1969,4 @@ Players.PlayerRemoving:Connect(function(p)
     if p == player then warn("[AutoHub] LocalPlayer removing") end
 end)
 
-print("test1 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
+print("test3 Aura Ascension AutoHub v4 loaded. Suffix system updated — supports up to Sxc (1e1803)")
