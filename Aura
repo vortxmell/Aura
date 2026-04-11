@@ -304,10 +304,11 @@ local function makeTabBtn(icon, posY)
     return btn
 end
 
--- 3 tabs: KOTH, Cursed Zone, Config
+-- 4 tabs: KOTH, Cursed Zone, KOTH+CZ, Config
 local TabKOTH   = makeTabBtn("👑", 8)
 local TabCZ     = makeTabBtn("💀", 50)
-local TabConfig = makeTabBtn("💾", 92)
+local TabKCZ    = makeTabBtn("⚔️", 92)
+local TabConfig = makeTabBtn("💾", 134)
 
 local TabIndicator = Instance.new("Frame")
 TabIndicator.Size            = UDim2.new(0, 3, 0, 24)
@@ -340,6 +341,7 @@ end
 local PanelConfig = makePanel(); PanelConfig.Visible = false
 local PanelKOTH   = makePanel(); PanelKOTH.Visible = false
 local PanelCZ     = makePanel()
+local PanelKCZ    = makePanel(); PanelKCZ.Visible = false
 
 -- ============================================================
 -- LAYOUT HELPERS
@@ -980,6 +982,183 @@ do
 end
 
 -- ============================================================
+-- KOTH + CZ PANEL
+-- ============================================================
+local kczSwitchHitbox, kczSwitchPill, kczSwitchDot, kczSwitchStroke
+local kczStatusLbl
+local autoKCZSwitch = false
+local kczH
+
+do
+    local PAD = 8
+
+    local function makeToggleFull(parent, labelText, y)
+        local Btn = Instance.new("Frame")
+        Btn.Size            = UDim2.new(1, -PAD*2, 0, ROW_H)
+        Btn.Position        = UDim2.new(0, PAD, 0, y)
+        Btn.BackgroundColor3 = PANEL
+        Btn.BorderSizePixel = 0
+        Btn.Parent          = parent
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        local Stroke = Instance.new("UIStroke", Btn)
+        Stroke.Color     = OFF_STROKE
+        Stroke.Thickness = 1
+        local Label = Instance.new("TextLabel")
+        Label.Size               = UDim2.new(1, -38, 1, 0)
+        Label.Position           = UDim2.new(0, 8, 0, 0)
+        Label.BackgroundTransparency = 1
+        Label.Text               = labelText
+        Label.TextColor3         = WHITE
+        Label.TextSize           = 9
+        Label.Font               = Enum.Font.GothamBold
+        Label.TextXAlignment     = Enum.TextXAlignment.Left
+        Label.Parent             = Btn
+        local Pill = Instance.new("Frame")
+        Pill.Size            = UDim2.new(0, 28, 0, 14)
+        Pill.Position        = UDim2.new(1, -34, 0.5, -7)
+        Pill.BackgroundColor3 = OFF_PILL
+        Pill.BorderSizePixel = 0
+        Pill.Parent          = Btn
+        Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
+        local Dot = Instance.new("Frame")
+        Dot.Size            = UDim2.new(0, 10, 0, 10)
+        Dot.Position        = UDim2.new(0, 2, 0.5, -5)
+        Dot.BackgroundColor3 = OFF_DOT
+        Dot.BorderSizePixel = 0
+        Dot.Parent          = Pill
+        Instance.new("UICorner", Dot).CornerRadius = UDim.new(1, 0)
+        local Hitbox = Instance.new("TextButton")
+        Hitbox.Size                 = UDim2.new(1, 0, 1, 0)
+        Hitbox.BackgroundTransparency = 1
+        Hitbox.Text                 = ""
+        Hitbox.Parent               = Btn
+        return Hitbox, Pill, Dot, Stroke, y + ROW_H + GAP
+    end
+
+    local y = GAP
+
+    -- Section header
+    local kczSecLbl = Instance.new("TextLabel")
+    kczSecLbl.Size               = UDim2.new(1, -PAD*2, 0, SEC_H)
+    kczSecLbl.Position           = UDim2.new(0, PAD+2, 0, y)
+    kczSecLbl.BackgroundTransparency = 1
+    kczSecLbl.Text               = "KOTH + CURSED ZONE"
+    kczSecLbl.TextColor3         = WHITE
+    kczSecLbl.TextSize           = 8
+    kczSecLbl.Font               = Enum.Font.GothamBold
+    kczSecLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    kczSecLbl.Parent             = PanelKCZ
+    y = y + SEC_H + GAP
+
+    -- Description label
+    local kczDescLbl = Instance.new("TextLabel")
+    kczDescLbl.Size               = UDim2.new(1, -PAD*2, 0, 28)
+    kczDescLbl.Position           = UDim2.new(0, PAD, 0, y)
+    kczDescLbl.BackgroundTransparency = 1
+    kczDescLbl.Text               = "Auto switch antara KOTH dan CZ\nbased on CZ spawn status."
+    kczDescLbl.TextColor3         = DIM
+    kczDescLbl.TextSize           = 8
+    kczDescLbl.Font               = Enum.Font.Gotham
+    kczDescLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    kczDescLbl.TextWrapped        = true
+    kczDescLbl.Parent             = PanelKCZ
+    y = y + 28 + GAP
+
+    -- Divider
+    local d = Instance.new("Frame")
+    d.Size            = UDim2.new(1, -PAD*2, 0, 1)
+    d.Position        = UDim2.new(0, PAD, 0, y)
+    d.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    d.BorderSizePixel = 0
+    d.Parent          = PanelKCZ
+    y = y + 1 + GAP
+
+    -- Main toggle
+    kczSwitchHitbox, kczSwitchPill, kczSwitchDot, kczSwitchStroke, y =
+        makeToggleFull(PanelKCZ, "⚔️ Auto Switch Mode", y)
+
+    -- Status label
+    kczStatusLbl = Instance.new("TextLabel")
+    kczStatusLbl.Size               = UDim2.new(1, -PAD*2, 0, STAT_H)
+    kczStatusLbl.Position           = UDim2.new(0, PAD, 0, y)
+    kczStatusLbl.BackgroundTransparency = 1
+    kczStatusLbl.Text               = "💤 Standby..."
+    kczStatusLbl.TextColor3         = DIM
+    kczStatusLbl.TextSize           = 9
+    kczStatusLbl.Font               = Enum.Font.Gotham
+    kczStatusLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    kczStatusLbl.Parent             = PanelKCZ
+    y = y + STAT_H + GAP
+
+    -- Divider
+    local d2 = Instance.new("Frame")
+    d2.Size            = UDim2.new(1, -PAD*2, 0, 1)
+    d2.Position        = UDim2.new(0, PAD, 0, y)
+    d2.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    d2.BorderSizePixel = 0
+    d2.Parent          = PanelKCZ
+    y = y + 1 + GAP
+
+    -- Info rows: CZ Spawned behaviour
+    local function makeInfoRow(parent, icon, label, yy)
+        local bg = Instance.new("Frame")
+        bg.Size                 = UDim2.new(1, -PAD*2, 0, 13)
+        bg.Position             = UDim2.new(0, PAD, 0, yy)
+        bg.BackgroundTransparency = 1
+        bg.Parent               = parent
+        local lbl = Instance.new("TextLabel")
+        lbl.Size             = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text             = icon .. " " .. label
+        lbl.TextColor3       = DIM
+        lbl.TextSize         = 8
+        lbl.Font             = Enum.Font.Gotham
+        lbl.TextXAlignment   = Enum.TextXAlignment.Left
+        lbl.Parent           = bg
+        return yy + 13 + 2
+    end
+
+    local kczHdrSpawned = Instance.new("TextLabel")
+    kczHdrSpawned.Size               = UDim2.new(1, -PAD*2, 0, SEC_H)
+    kczHdrSpawned.Position           = UDim2.new(0, PAD+2, 0, y)
+    kczHdrSpawned.BackgroundTransparency = 1
+    kczHdrSpawned.Text               = "CZ SPAWNED → "
+    kczHdrSpawned.TextColor3         = CURSE
+    kczHdrSpawned.TextSize           = 8
+    kczHdrSpawned.Font               = Enum.Font.GothamBold
+    kczHdrSpawned.TextXAlignment     = Enum.TextXAlignment.Left
+    kczHdrSpawned.Parent             = PanelKCZ
+    y = y + SEC_H + 2
+
+    y = makeInfoRow(PanelKCZ, "🔴", "Auto Enter KOTH → OFF",      y)
+    y = makeInfoRow(PanelKCZ, "🔴", "Auto Server Hop KOTH → OFF", y)
+    y = makeInfoRow(PanelKCZ, "🟢", "Auto TP to CZ → ON",         y)
+    y = makeInfoRow(PanelKCZ, "🟢", "Auto Server Hop CZ → ON",    y)
+    y = makeInfoRow(PanelKCZ, "🟢", "Auto Re-enter CZ → ON",      y)
+    y = y + GAP
+
+    local kczHdrDesp = Instance.new("TextLabel")
+    kczHdrDesp.Size               = UDim2.new(1, -PAD*2, 0, SEC_H)
+    kczHdrDesp.Position           = UDim2.new(0, PAD+2, 0, y)
+    kczHdrDesp.BackgroundTransparency = 1
+    kczHdrDesp.Text               = "CZ DESPAWNED → "
+    kczHdrDesp.TextColor3         = WARN
+    kczHdrDesp.TextSize           = 8
+    kczHdrDesp.Font               = Enum.Font.GothamBold
+    kczHdrDesp.TextXAlignment     = Enum.TextXAlignment.Left
+    kczHdrDesp.Parent             = PanelKCZ
+    y = y + SEC_H + 2
+
+    y = makeInfoRow(PanelKCZ, "🟢", "Auto Enter KOTH → ON",       y)
+    y = makeInfoRow(PanelKCZ, "🟢", "Auto Server Hop KOTH → ON",  y)
+    y = makeInfoRow(PanelKCZ, "🔴", "Auto TP to CZ → OFF",        y)
+    y = makeInfoRow(PanelKCZ, "🔴", "Auto Server Hop CZ → OFF",   y)
+    y = makeInfoRow(PanelKCZ, "🔴", "Auto Re-enter CZ → OFF",     y)
+
+    kczH = y + GAP
+end
+
+-- ============================================================
 -- CONFIG PANEL
 -- ============================================================
 local configNameBox, btnSave, configList, configListLayout
@@ -1146,7 +1325,7 @@ end
 -- ============================================================
 -- RESIZE MAIN
 -- ============================================================
-local fullH = PAD_TOP + math.max(kothH, czH, configH) + GAP
+local fullH = PAD_TOP + math.max(kothH, czH, configH, kczH) + GAP
 Main.Size     = UDim2.new(0, 320, 0, fullH)
 Main.Position = UDim2.new(0.5, 0, 0.5, -math.floor(fullH / 2))
 
@@ -1357,13 +1536,16 @@ local function switchTab(tab)
     PanelConfig.Visible = (tab == "config")
     PanelKOTH.Visible   = (tab == "koth")
     PanelCZ.Visible     = (tab == "cz")
+    PanelKCZ.Visible    = (tab == "kcz")
     TabConfig.TextColor3 = tab == "config" and WHITE or DIM
     TabKOTH.TextColor3   = tab == "koth"   and WHITE or DIM
     TabCZ.TextColor3     = tab == "cz"     and WHITE or DIM
+    TabKCZ.TextColor3    = tab == "kcz"    and WHITE or DIM
     TweenService:Create(TabConfig,    tweenInfo, {BackgroundTransparency = tab=="config" and 0.6 or 1}):Play()
     TweenService:Create(TabKOTH,      tweenInfo, {BackgroundTransparency = tab=="koth"   and 0.6 or 1}):Play()
     TweenService:Create(TabCZ,        tweenInfo, {BackgroundTransparency = tab=="cz"     and 0.6 or 1}):Play()
-    local indY = tab=="koth" and 13 or tab=="cz" and 55 or 97
+    TweenService:Create(TabKCZ,       tweenInfo, {BackgroundTransparency = tab=="kcz"    and 0.6 or 1}):Play()
+    local indY = tab=="koth" and 13 or tab=="cz" and 55 or tab=="kcz" and 97 or 139
     TweenService:Create(TabIndicator, tweenInfo, {Position = UDim2.new(0,0,0, indY)}):Play()
     if tab == "koth" then updateKOTHPanel() end
     if tab == "cz"   then updateCZPanel()   end
@@ -1372,6 +1554,7 @@ end
 TabConfig.MouseButton1Click:Connect(function() switchTab("config") end)
 TabKOTH.MouseButton1Click:Connect(function()   switchTab("koth")   end)
 TabCZ.MouseButton1Click:Connect(function()     switchTab("cz")     end)
+TabKCZ.MouseButton1Click:Connect(function()    switchTab("kcz")    end)
 switchTab("cz")
 
 -- ============================================================
@@ -1736,6 +1919,99 @@ czMultiInput.FocusLost:Connect(function()
 end)
 
 -- ============================================================
+-- KOTH+CZ SGN TOGGLE HANDLER
+-- ============================================================
+
+-- Helper: set KOTH toggles tanpa fire click event
+local function setKothAuto(on)
+    autoKOTH = on
+    setToggle(kAutoPill, kAutoDot, kAutoStroke, on)
+    kAutoStatus.Text      = on and "🔄 Running..." or "💤 Idle"
+    kAutoStatus.TextColor3 = on and GREEN or DIM
+end
+
+local function setKothHop(on)
+    autoServerHop = on
+    setToggle(kHopPill, kHopDot, kHopStroke, on)
+end
+
+local function setCZTeleport(on)
+    autoCZTeleport = on
+    setToggle(czTpPill, czTpDot, czTpStroke, on)
+    if not on then czTeleportDebounce = false end
+end
+
+local function setCZHop(on)
+    autoCZServerHop = on
+    setToggle(czHopPill, czHopDot, czHopStroke, on)
+    if not on then czInsideZone = false end
+end
+
+local function setCZGuard(on)
+    autoCZGuard = on
+    setToggle(czGuardPill, czGuardDot, czGuardStroke, on)
+end
+
+kczSwitchHitbox.MouseButton1Click:Connect(function()
+    autoKCZSwitch = not autoKCZSwitch
+    setToggle(kczSwitchPill, kczSwitchDot, kczSwitchStroke, autoKCZSwitch)
+    if autoKCZSwitch then
+        kczStatusLbl.Text      = "🔍 Monitoring CZ..."
+        kczStatusLbl.TextColor3 = Color3.fromRGB(150, 220, 255)
+    else
+        kczStatusLbl.Text      = "💤 Standby..."
+        kczStatusLbl.TextColor3 = DIM
+    end
+end)
+
+-- ============================================================
+-- KCZ AUTO SWITCH LOOP
+-- ============================================================
+task.spawn(function()
+    local killed = false
+    killEvent.Event:Connect(function() killed = true end)
+
+    local lastState = nil  -- "spawned" atau "despawned"
+
+    while not killed and ScreenGui.Parent do
+        if autoKCZSwitch then
+            local spawned = getCZInfo()
+
+            if spawned and lastState ~= "spawned" then
+                -- CZ baru spawn
+                lastState = "spawned"
+                -- Turn OFF KOTH features
+                setKothAuto(false)
+                setKothHop(false)
+                -- Turn ON CZ features
+                setCZTeleport(true)
+                setCZHop(true)
+                setCZGuard(true)
+                kczStatusLbl.Text      = "💀 CZ Spawned — Mode CZ aktif"
+                kczStatusLbl.TextColor3 = CURSE
+
+            elseif not spawned and lastState ~= "despawned" then
+                -- CZ baru despawn
+                lastState = "despawned"
+                -- Turn ON KOTH features
+                setKothAuto(true)
+                setKothHop(true)
+                -- Turn OFF CZ features
+                setCZTeleport(false)
+                setCZHop(false)
+                setCZGuard(false)
+                kczStatusLbl.Text      = "👑 CZ Despawned — Mode KOTH aktif"
+                kczStatusLbl.TextColor3 = WARN
+            end
+        else
+            lastState = nil
+        end
+
+        task.wait(2)
+    end
+end)
+
+-- ============================================================
 -- CONFIG SYSTEM
 -- ============================================================
 local function setConfigStatus(msg, isErr)
@@ -1760,6 +2036,7 @@ local function getCurrentSettings()
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
         kothRebirthGroup      = kothRebirthGroup,
+        autoKCZSwitch         = autoKCZSwitch,
     }
 end
 
@@ -1818,6 +2095,12 @@ local function applySettings(s)
     end
     if s.kothRebirthGroup ~= nil then
         kothRebirthGroup = s.kothRebirthGroup
+    end
+    if s.autoKCZSwitch ~= nil then
+        autoKCZSwitch = s.autoKCZSwitch
+        setToggle(kczSwitchPill, kczSwitchDot, kczSwitchStroke, autoKCZSwitch)
+        kczStatusLbl.Text      = autoKCZSwitch and "🔍 Monitoring CZ..." or "💤 Standby..."
+        kczStatusLbl.TextColor3 = autoKCZSwitch and Color3.fromRGB(150, 220, 255) or DIM
     end
     updateKRebTarget()
 end
@@ -1977,6 +2260,7 @@ end)
 CloseBtn.MouseButton1Click:Connect(function()
     autoKOTH = false; autoKothRebirth = false; autoNotifRebirth = false
     autoCZTeleport = false; autoCZServerHop = false; autoCZGuard = false
+    autoKCZSwitch = false
     killEvent:Fire()
     ScreenGui:Destroy()
 end)
