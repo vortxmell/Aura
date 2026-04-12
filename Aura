@@ -142,6 +142,7 @@ local autoCZServerHop       = false
 local autoCZGuard           = false  -- NEW: CZ Guard
 local czInsideZone          = false
 local czMinMulti            = 3      -- default minimum multi threshold (always active)
+local czStandbyThreshold    = 20
 
 -- ============================================================
 -- CONSTANTS
@@ -769,7 +770,7 @@ local czStatusDot, czRowStatus, czRowTimer, czRowLocation, czRowMulti
 local czTpHitbox,  czTpPill,  czTpDot,  czTpStroke
 local czGuardHitbox, czGuardPill, czGuardDot, czGuardStroke
 local czHopHitbox, czHopPill, czHopDot, czHopStroke   -- NEW: server hop toggle
-local czMultiInput  -- multi threshold inputbox
+local czMultiInput, czStandbyInput  -- multi + standby inputboxes
 local czTpStatus
 local czH
 
@@ -964,6 +965,56 @@ do
         xLbl.Parent             = MultiHopRow
 
         y = y + rowH + GAP
+    end
+
+    -- Standby timer row (M:SS format)
+    do
+        local czSRow = Instance.new("Frame")
+        czSRow.Size            = UDim2.new(1, -PAD*2, 0, ROW_H)
+        czSRow.Position        = UDim2.new(0, PAD, 0, y)
+        czSRow.BackgroundColor3 = PANEL
+        czSRow.BorderSizePixel = 0
+        czSRow.Parent          = PanelCZ
+        Instance.new("UICorner", czSRow).CornerRadius = UDim.new(0, 6)
+        local czSStroke = Instance.new("UIStroke", czSRow)
+        czSStroke.Color        = Color3.fromRGB(60, 45, 90)
+        czSStroke.Thickness    = 1
+        local czSLabel = Instance.new("TextLabel")
+        czSLabel.Size          = UDim2.new(1, -65, 1, 0)
+        czSLabel.Position      = UDim2.new(0, 8, 0, 0)
+        czSLabel.BackgroundTransparency = 1
+        czSLabel.Text          = "Standby if timer <="
+        czSLabel.TextColor3    = WHITE
+        czSLabel.TextSize      = 9
+        czSLabel.Font          = Enum.Font.GothamBold
+        czSLabel.TextXAlignment = Enum.TextXAlignment.Left
+        czSLabel.Parent        = czSRow
+        czStandbyInput = Instance.new("TextBox")
+        czStandbyInput.Size             = UDim2.new(0, 42, 0, ROW_H - 4)
+        czStandbyInput.Position         = UDim2.new(1, -60, 0.5, -(ROW_H-4)/2)
+        czStandbyInput.BackgroundColor3 = Color3.fromRGB(30, 26, 44)
+        czStandbyInput.BorderSizePixel  = 0
+        czStandbyInput.Text             = "0:20"
+        czStandbyInput.TextColor3       = Color3.fromRGB(200, 160, 255)
+        czStandbyInput.TextSize         = 10
+        czStandbyInput.Font             = Enum.Font.GothamBold
+        czStandbyInput.PlaceholderText  = "0:20"
+        czStandbyInput.ClearTextOnFocus = true
+        czStandbyInput.Parent           = czSRow
+        Instance.new("UICorner", czStandbyInput).CornerRadius = UDim.new(0, 4)
+        local czSInputStroke = Instance.new("UIStroke", czStandbyInput)
+        czSInputStroke.Color     = Color3.fromRGB(110, 70, 200)
+        czSInputStroke.Thickness = 1
+        local czSSuffix = Instance.new("TextLabel")
+        czSSuffix.Size          = UDim2.new(0, 18, 1, 0)
+        czSSuffix.Position      = UDim2.new(1, -16, 0, 0)
+        czSSuffix.BackgroundTransparency = 1
+        czSSuffix.Text          = "m:s"
+        czSSuffix.TextColor3    = Color3.fromRGB(180, 140, 220)
+        czSSuffix.TextSize      = 8
+        czSSuffix.Font          = Enum.Font.GothamBold
+        czSSuffix.Parent        = czSRow
+        y = y + ROW_H + GAP
     end
 
     czTpStatus = Instance.new("TextLabel")
@@ -1918,6 +1969,15 @@ czMultiInput.FocusLost:Connect(function()
     czMultiInput.Text = tostring(czMinMulti)
 end)
 
+czStandbyInput.FocusLost:Connect(function()
+    local t = czStandbyInput.Text:gsub("%s+", "")
+    if t == "" then
+        czStandbyInput.Text = "0:20"
+    else
+        czStandbyInput.Text = t
+    end
+end)
+
 -- ============================================================
 -- KOTH+CZ SGN TOGGLE HANDLER
 -- ============================================================
@@ -2032,6 +2092,7 @@ local function getCurrentSettings()
         autoCZServerHop       = autoCZServerHop,
         autoCZGuard           = autoCZGuard,
         czMinMulti            = czMinMulti,
+        czStandbyThreshold    = czStandbyInput and czStandbyInput.Text or "0:20",
         kothRebirthMultiplier = kothRebirthMultiplier,
         kothRebirthVal        = kothRebirthVal,
         kothRebirthUnit       = kothRebirthUnit,
@@ -2080,6 +2141,11 @@ local function applySettings(s)
     if s.czMinMulti ~= nil then
         czMinMulti = s.czMinMulti
         czMultiInput.Text = tostring(czMinMulti)
+    end
+    if s.czStandbyThreshold ~= nil then
+        if czStandbyInput then
+            czStandbyInput.Text = tostring(s.czStandbyThreshold)
+        end
     end
     if s.kothRebirthMultiplier ~= nil then
         kothRebirthMultiplier = s.kothRebirthMultiplier
@@ -2607,7 +2673,7 @@ task.spawn(function()
                         hopScheduled = false
                     end
 
-                elseif secs ~= nil and secs > 20 then
+                elseif secs ~= nil and secs > (function(t) local m,s=t:match("^(%d+):(%d+)$") if m then return tonumber(m)*60+tonumber(s) end return tonumber(t) or czStandbyThreshold end)(czStandbyInput and czStandbyInput.Text or "") then
                     -- Timer lama lagi → hop cari server lain
                     if not hopScheduled then
                         hopScheduled = true
@@ -2620,7 +2686,7 @@ task.spawn(function()
                         hopScheduled = false
                     end
 
-                elseif secs ~= nil and secs <= 20 then
+                elseif secs ~= nil and secs <= (function(t) local m,s=t:match("^(%d+):(%d+)$") if m then return tonumber(m)*60+tonumber(s) end return tonumber(t) or czStandbyThreshold end)(czStandbyInput and czStandbyInput.Text or "") then
                     -- Nak spawn dalam masa terdekat → standby, reset flag
                     hopScheduled = false
                     czTpStatus.Text       = "⏳ Spawn dalam " .. (timerText or "?") .. ", standby..."
